@@ -10,77 +10,102 @@ class Stm32Bridge(Node):
     def __init__(self):
         super().__init__('stm32_uart_bridge')
         
-        # --- KONFIGURASI SERIAL ---
-        # Pastikan port ini sesuai dengan hasil 'ls /dev/ttyUSB*'
-        self.port_name = '/dev/ttyUSB0'
+        # --- CONFIGURATION ---
+        self.port_name = '/dev/ttyUSB0' # Adjust if needed
         self.baud_rate = 115200
         
-        # Variabel untuk menyimpan data terakhir (untuk safety)
-        self.left_tick = 0
-        self.right_tick = 0
+        # --- ENCODER STATE TRACKING ---
+        # We need to track the previous raw values to calculate distance
+        self.prev_left_raw = 0
+        self.prev_right_raw = 0
+        
+        # These accumulate the TOTAL ticks since start (can go to millions)
+        self.total_left_ticks = 0
+        self.total_right_ticks = 0
+        
+        self.is_first_message = True
 
-        # Mencoba membuka koneksi serial
+        # --- SERIAL CONNECTION ---
         try:
             self.ser = serial.Serial(self.port_name, self.baud_rate, timeout=1)
             self.ser.reset_input_buffer()
-            self.get_logger().info(f'Berhasil terhubung ke STM32 di {self.port_name}')
+            self.get_logger().info(f'Connected to STM32 at {self.port_name}')
         except serial.SerialException as e:
-            self.get_logger().error(f'Gagal membuka serial port: {e}')
-            # Kita matikan node jika serial gagal, karena percuma jalan tanpa data
+            self.get_logger().error(f'Failed to open serial port: {e}')
             exit(1)
 
-        # --- KONFIGURASI ROS 2 ---
-        # Kita gunakan Int32MultiArray: [encoder_kiri, encoder_kanan]
-        self.publisher_ = self.create_publisher(Int32MultiArray, 'wheel_encoders', 10)
+        # --- ROS PUBLISHER ---
+        # We publish the TOTAL ACCUMULATED ticks
+        self.pub_encoders = self.create_publisher(Int32MultiArray, 'wheel_encoders', 10)
         
-        # Timer: Membaca data secepat mungkin (0.01 detik = 100Hz)
-        self.timer = self.create_timer(0.01, self.read_serial_data)
+        # Read loop at 50Hz (0.02s)
+        self.timer = self.create_timer(0.02, self.read_serial_data)
+
+    def calculate_delta(self, current, previous):
+        """
+        Calculates the difference between two 16-bit signed integers.
+        Handles the overflow/wrap-around logic.
+        Range of input: -32768 to 32767
+        """
+        delta = current - previous
+        
+        # Handle Wrap-Around (Overflow)
+        # If delta is too large positive, it means we wrapped backward
+        if delta > 32768:
+            delta -= 65536
+        # If delta is too large negative, it means we wrapped forward
+        elif delta < -32768:
+            delta += 65536
+            
+        return delta
 
     def read_serial_data(self):
-        # Cek apakah ada data yang masuk di kabel
         if self.ser.in_waiting > 0:
             try:
-                # 1. Baca satu baris teks (decode dari bytes ke string)
                 line = self.ser.readline().decode('utf-8').strip()
                 
-                # 2. Validasi format JSON sederhana
-                # Kita cek apakah diawali '{' dan diakhiri '}' agar tidak parsing sampah
+                # Parse JSON: {"l": 123, "r": -456}
                 if line.startswith('{') and line.endswith('}'):
-                    
-                    # 3. Parsing JSON ke Dictionary Python
                     data = json.loads(line)
                     
-                    # Ambil data 'l' dan 'r', gunakan nilai lama jika key tidak ada
-                    self.left_tick = data.get('l', self.left_tick)
-                    self.right_tick = data.get('r', self.right_tick)
+                    raw_left = data.get('l', 0)
+                    raw_right = data.get('r', 0)
 
-                    # 4. Bungkus data ke pesan ROS
+                    # Initialize on first run
+                    if self.is_first_message:
+                        self.prev_left_raw = raw_left
+                        self.prev_right_raw = raw_right
+                        self.is_first_message = False
+                        return
+
+                    # Calculate change since last read
+                    delta_left = self.calculate_delta(raw_left, self.prev_left_raw)
+                    delta_right = self.calculate_delta(raw_right, self.prev_right_raw)
+
+                    # Update totals
+                    self.total_left_ticks += delta_left
+                    self.total_right_ticks += delta_right
+
+                    # Save current raw values for next time
+                    self.prev_left_raw = raw_left
+                    self.prev_right_raw = raw_right
+
+                    # Publish to ROS
                     msg = Int32MultiArray()
-                    msg.data = [self.left_tick, self.right_tick]
-                    
-                    # 5. Kirim (Publish)
-                    self.publisher_.publish(msg)
-                    
-                    # Debugging (Opsional: Hidupkan jika ingin melihat log di terminal)
-                    # self.get_logger().info(f'Publish: L={self.left_tick}, R={self.right_tick}')
+                    msg.data = [self.total_left_ticks, self.total_right_ticks]
+                    self.pub_encoders.publish(msg)
 
-            except json.JSONDecodeError:
-                # Ini wajar terjadi sesekali jika kabel goyang atau data terpotong
-                self.get_logger().warn(f'Data Rusak (JSON Error): {line}')
-            except UnicodeDecodeError:
-                self.get_logger().warn('Data Rusak (Encoding Error)')
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass # Ignore bad packets
             except Exception as e:
-                self.get_logger().error(f'Error Tak Terduga: {e}')
+                self.get_logger().warn(f'Error: {e}')
 
 def main(args=None):
     rclpy.init(args=args)
     node = Stm32Bridge()
-    
     try:
-        # Biarkan node hidup terus
         rclpy.spin(node)
     except KeyboardInterrupt:
-        # Menangani Ctrl+C dengan rapi
         pass
     finally:
         node.destroy_node()
