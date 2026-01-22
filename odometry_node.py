@@ -11,13 +11,12 @@ class OdometryNode(Node):
     def __init__(self):
         super().__init__('odometry_node')
 
-        # --- Physical Configuration (real measurement to meter) ---
+        # --- KONFIGURASI FISIK ---
         self.wheel_diameter = 0.068
         self.wheel_base = 0.30
         self.ticks_per_rev = 4600.0
         
-        # --- POLARITY CORRECTION ---
-        #change rather to minus or plus (1.0 / -1.0) for the polarity
+        # --- POLARITY ---
         self.polarity_left = -1.0  
         self.polarity_right = -1.0 
         
@@ -47,7 +46,6 @@ class OdometryNode(Node):
         self.get_logger().info('Odometry Node Started.')
 
     def encoder_callback(self, msg):
-        # TERAPKAN POLARITAS DI SINI
         current_left = msg.data[0] * self.polarity_left
         current_right = msg.data[1] * self.polarity_right
 
@@ -60,9 +58,7 @@ class OdometryNode(Node):
         d_left_ticks = current_left - self.prev_left_ticks
         d_right_ticks = current_right - self.prev_right_ticks
 
-        # Debug hanya jika bergerak
         if d_left_ticks != 0 or d_right_ticks != 0:
-             # Kita log data raw delta untuk memastikan arah
              self.get_logger().info(f'Gerak: dL={d_left_ticks} dR={d_right_ticks} | Posisi X={self.x:.3f}')
 
         self.prev_left_ticks = current_left
@@ -78,13 +74,15 @@ class OdometryNode(Node):
         self.y += d_center * math.sin(self.theta)
         self.theta += d_theta
         
-        # Normalisasi sudut
         self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
 
         self.publish_odometry()
 
     def publish_odometry(self):
-        current_time = self.get_clock().now().to_msg()
+        # Ambil waktu sekarang
+        now = self.get_clock().now()
+        current_time = now.to_msg()
+        
         q = self.euler_to_quaternion(0, 0, self.theta)
 
         # 1. Publish TF (odom -> base_link)
@@ -96,11 +94,13 @@ class OdometryNode(Node):
         t.transform.translation.y = self.y
         t.transform.translation.z = 0.0
         t.transform.rotation = q
+        
+        # PENTING: Kirim TF dulu sebelum Odom message
         self.tf_broadcaster.sendTransform(t)
 
         # 2. Publish Topic (/odom)
         odom = Odometry()
-        odom.header.stamp = current_time
+        odom.header.stamp = current_time # Pastikan timestamp sama persis dengan TF
         odom.header.frame_id = 'odom'
         odom.child_frame_id = 'base_link'
         
