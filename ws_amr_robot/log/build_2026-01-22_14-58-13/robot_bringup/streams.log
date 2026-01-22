@@ -1,0 +1,41 @@
+[1.382s] Invoking command in '/home/kanal-raspi5/ws_amr_robot/build/robot_bringup': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 62747 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --uninstall --editable --build-directory /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build
+[2.023s] running develop
+[2.354s] Removing /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot-bringup.egg-link (link to .)
+[2.454s] Invoked command in '/home/kanal-raspi5/ws_amr_robot/build/robot_bringup' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 62747 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --uninstall --editable --build-directory /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build
+[2.456s] Invoking command in '/home/kanal-raspi5/ws_amr_robot/src/robot_bringup': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 62747 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_bringup build --build-base /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build install --record /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/install.log --single-version-externally-managed install_data --force
+[2.847s] running egg_info
+[2.871s] writing ../../build/robot_bringup/robot_bringup.egg-info/PKG-INFO
+[2.871s] writing dependency_links to ../../build/robot_bringup/robot_bringup.egg-info/dependency_links.txt
+[2.872s] writing entry points to ../../build/robot_bringup/robot_bringup.egg-info/entry_points.txt
+[2.872s] writing requirements to ../../build/robot_bringup/robot_bringup.egg-info/requires.txt
+[2.872s] writing top-level names to ../../build/robot_bringup/robot_bringup.egg-info/top_level.txt
+[2.921s] reading manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+[2.923s] writing manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+[2.923s] running build
+[2.923s] running build_py
+[2.923s] copying robot_bringup/stm32_bridge.py -> /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+[2.923s] copying robot_bringup/odometry_node.py -> /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+[2.924s] running install
+[2.934s] running install_lib
+[2.962s] creating /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[2.963s] copying /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/stm32_bridge.py -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[2.963s] copying /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/odometry_node.py -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[2.963s] copying /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/__init__.py -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[2.964s] byte-compiling /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/stm32_bridge.py to stm32_bridge.cpython-312.pyc
+[2.965s] byte-compiling /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/odometry_node.py to odometry_node.cpython-312.pyc
+[2.967s] byte-compiling /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/__init__.py to __init__.cpython-312.pyc
+[2.967s] running install_data
+[2.967s] copying resource/robot_bringup -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index/packages
+[2.967s] copying package.xml -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/robot_bringup
+[2.968s] copying launch/robot_bringup.launch.py -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.968s] copying resource/robot_bringup -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index/packages
+[2.968s] copying package.xml -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/robot_bringup
+[2.968s] copying launch/robot_bringup.launch.py -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.968s] copying rviz/default.rviz -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/share/robot_bringup/rviz
+[2.968s] running install_egg_info
+[2.995s] Copying ../../build/robot_bringup/robot_bringup.egg-info to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup-0.0.0-py3.12.egg-info
+[2.996s] running install_scripts
+[3.183s] Installing odometry_node script to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[3.183s] Installing stm32_bridge script to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[3.183s] writing list of installed files to '/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/install.log'
+[3.279s] Invoked command in '/home/kanal-raspi5/ws_amr_robot/src/robot_bringup' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 62747 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_bringup build --build-base /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build install --record /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/install.log --single-version-externally-managed install_data --force

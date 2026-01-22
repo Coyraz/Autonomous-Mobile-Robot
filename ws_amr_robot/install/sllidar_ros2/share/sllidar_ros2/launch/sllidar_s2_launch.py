@@ -1,0 +1,1 @@
+/home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/launch/sllidar_s2_launch.py
