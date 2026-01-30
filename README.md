@@ -11,7 +11,7 @@ for every terminal you want to use, you should exec this command:
 or this command:
 
     cd ws_amr_robot
-    source install/setup.bash`
+    source install/setup.bash
 
 PS:
 for running the ros2 node:
