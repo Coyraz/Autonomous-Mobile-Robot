@@ -7,3 +7,15 @@ PS:
 - for every terminal you want to use, you should exec this command:
 
 ` source /opt/ros/jazzy/setup.bash `
+
+or this command:
+
+`cd ws_amr_robot`
+`source install/setup.bash`
+
+PS:
+for running the ros2 node:
+`ros2 launch robot_bringup robot_bringup.launch.py`
+
+for running the teleop:
+`ros2 run robot_bringup teleop_keyboard`
