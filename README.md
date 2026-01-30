@@ -14,8 +14,7 @@ or this command:
 `source install/setup.bash`
 
 PS:
-for running the ros2 node:
+- for running the ros2 node:
 `ros2 launch robot_bringup robot_bringup.launch.py`
-
-for running the teleop:
+- for running the teleop:
 `ros2 run robot_bringup teleop_keyboard`
