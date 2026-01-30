@@ -1,108 +1,131 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int32MultiArray 
 import serial
 import json
-import time
+from std_msgs.msg import Int32MultiArray
+from geometry_msgs.msg import Twist
 
-class Stm32Bridge(Node):
+class STM32Bridge(Node):
     def __init__(self):
-        super().__init__('stm32_uart_bridge')
+        super().__init__('stm32_bridge')
         
-        # --- CONFIGURATION ---
-        self.port_name = '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A5069RR4-if00-port0' # Adjust if needed
+        # Serial connection
+        self.port_name = '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A5069RR4-if00-port0'
         self.baud_rate = 115200
         
-        # --- ENCODER STATE TRACKING ---
-        # We need to track the previous raw values to calculate distance
-        self.prev_left_raw = 0
-        self.prev_right_raw = 0
-        
-        # These accumulate the TOTAL ticks since start (can go to millions)
-        self.total_left_ticks = 0
-        self.total_right_ticks = 0
-        
-        self.is_first_message = True
-
-        # --- SERIAL CONNECTION ---
         try:
-            self.ser = serial.Serial(self.port_name, self.baud_rate, timeout=1)
+            self.ser = serial.Serial(self.port_name, self.baud_rate, timeout=0.1)
             self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
             self.get_logger().info(f'Connected to STM32 at {self.port_name}')
         except serial.SerialException as e:
             self.get_logger().error(f'Failed to open serial port: {e}')
             exit(1)
-
-        # --- ROS PUBLISHER ---
-        # We publish the TOTAL ACCUMULATED ticks
-        self.pub_encoders = self.create_publisher(Int32MultiArray, 'wheel_encoders', 10)
         
-        # Read loop at 50Hz (0.02s)
-        self.timer = self.create_timer(0.005, self.read_serial_data)
-
+        # Encoder tracking (overflow handling)
+        self.prev_left_raw = 0
+        self.prev_right_raw = 0
+        self.total_left_ticks = 0
+        self.total_right_ticks = 0
+        self.is_first_message = True
+        
+        # Publisher for encoder data
+        self.encoder_pub = self.create_publisher(Int32MultiArray, '/wheel_encoders', 10)
+        
+        # Subscriber for velocity commands
+        self.cmd_vel_sub = self.create_subscription(
+            Twist,
+            '/cmd_vel',
+            self.cmd_vel_callback,
+            10
+        )
+        
+        # Current velocity command
+        self.current_v = 0  # mm/s
+        self.current_w = 0  # mrad/s
+        
+        # Timer at 10Hz (slower = more stable)
+        self.timer = self.create_timer(0.1, self.timer_callback)
+        
+        self.get_logger().info('STM32 Bridge Active (Read + Write)')
+    
     def calculate_delta(self, current, previous):
-        """
-        Calculates the difference between two 16-bit signed integers.
-        Handles the overflow/wrap-around logic.
-        Range of input: -32768 to 32767
-        """
+        """Calculate delta with 16-bit overflow handling"""
         delta = current - previous
-        
-        # Handle Wrap-Around (Overflow)
-        # If delta is too large positive, it means we wrapped backward
         if delta > 32768:
             delta -= 65536
-        # If delta is too large negative, it means we wrapped forward
         elif delta < -32768:
             delta += 65536
-            
         return delta
-
-    def read_serial_data(self):
-        if self.ser.in_waiting > 0:
-            try:
-                line = self.ser.readline().decode('utf-8').strip()
+    
+    def cmd_vel_callback(self, msg):
+        """Convert Twist message to STM32 format"""
+        self.current_v = int(msg.linear.x * 1000)   # m/s to mm/s
+        self.current_w = int(msg.angular.z * 1000)  # rad/s to mrad/s
+        
+        # Clamp values
+        self.current_v = max(-1000, min(1000, self.current_v))
+        self.current_w = max(-2000, min(2000, self.current_w))
+    
+    def timer_callback(self):
+        """Combined read encoder + write command at 10Hz"""
+        
+        # 1. Send command to STM32
+        try:
+            cmd_str = f"V:{self.current_v},W:{self.current_w}\r\n"
+            self.ser.write(cmd_str.encode('utf-8'))
+        except Exception as e:
+            self.get_logger().error(f'Send error: {e}')
+            return
+        
+        # 2. Read encoder data from STM32
+        try:
+            if self.ser.in_waiting > 0:
+                line = self.ser.readline().decode('utf-8', errors='ignore').strip()
                 
-                # Parse JSON: {"l": 123, "r": -456}
                 if line.startswith('{') and line.endswith('}'):
-                    data = json.loads(line)
-                    
-                    raw_left = data.get('l', 0)
-                    raw_right = data.get('r', 0)
-
-                    # Initialize on first run
-                    if self.is_first_message:
-                        self.prev_left_raw = raw_left
-                        self.prev_right_raw = raw_right
-                        self.is_first_message = False
-                        return
-
-                    # Calculate change since last read
-                    delta_left = self.calculate_delta(raw_left, self.prev_left_raw)
-                    delta_right = self.calculate_delta(raw_right, self.prev_right_raw)
-
-                    # Update totals
-                    self.total_left_ticks += delta_left
-                    self.total_right_ticks += delta_right
-
-                    # Save current raw values for next time
-                    self.prev_left_raw = raw_left
-                    self.prev_right_raw = raw_right
-
-                    # Publish to ROS
-                    msg = Int32MultiArray()
-                    msg.data = [self.total_left_ticks, self.total_right_ticks]
-                    self.pub_encoders.publish(msg)
-
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                pass # Ignore bad packets
-            except Exception as e:
-                self.get_logger().warn(f'Error: {e}')
+                    try:
+                        data = json.loads(line)
+                        
+                        if 'l' in data and 'r' in data:
+                            raw_left = data['l']
+                            raw_right = data['r']
+                            
+                            # Initialize on first run
+                            if self.is_first_message:
+                                self.prev_left_raw = raw_left
+                                self.prev_right_raw = raw_right
+                                self.is_first_message = False
+                                return
+                            
+                            # Calculate change since last read
+                            delta_left = self.calculate_delta(raw_left, self.prev_left_raw)
+                            delta_right = self.calculate_delta(raw_right, self.prev_right_raw)
+                            
+                            # Update totals
+                            self.total_left_ticks += delta_left
+                            self.total_right_ticks += delta_right
+                            
+                            # Save current raw values
+                            self.prev_left_raw = raw_left
+                            self.prev_right_raw = raw_right
+                            
+                            # Publish encoder data
+                            msg = Int32MultiArray()
+                            msg.data = [self.total_left_ticks, self.total_right_ticks]
+                            self.encoder_pub.publish(msg)
+                            
+                    except json.JSONDecodeError:
+                        pass
+                        
+        except Exception as e:
+            self.get_logger().error(f'Read error: {e}')
 
 def main(args=None):
     rclpy.init(args=args)
-    node = Stm32Bridge()
+    node = STM32Bridge()
+    
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

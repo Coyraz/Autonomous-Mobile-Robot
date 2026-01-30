@@ -1,0 +1,27 @@
+[1.656s] Invoking command in '/home/kanal-raspi5/ws_amr_robot/src/robot_bringup': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57528 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_bringup build --build-base /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build install --record /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/install.log --single-version-externally-managed install_data
+[2.047s] running egg_info
+[2.070s] writing ../../build/robot_bringup/robot_bringup.egg-info/PKG-INFO
+[2.071s] writing dependency_links to ../../build/robot_bringup/robot_bringup.egg-info/dependency_links.txt
+[2.071s] writing entry points to ../../build/robot_bringup/robot_bringup.egg-info/entry_points.txt
+[2.071s] writing requirements to ../../build/robot_bringup/robot_bringup.egg-info/requires.txt
+[2.072s] writing top-level names to ../../build/robot_bringup/robot_bringup.egg-info/top_level.txt
+[2.126s] reading manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+[2.127s] writing manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+[2.129s] running build
+[2.130s] running build_py
+[2.130s] copying robot_bringup/teleop_keyboard.py -> /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+[2.133s] running install
+[2.143s] running install_lib
+[2.167s] copying /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/teleop_keyboard.py -> /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[2.168s] byte-compiling /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/teleop_keyboard.py to teleop_keyboard.cpython-312.pyc
+[2.171s] running install_data
+[2.171s] running install_egg_info
+[2.197s] removing '/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup-0.0.0-py3.12.egg-info' (and everything under it)
+[2.197s] Copying ../../build/robot_bringup/robot_bringup.egg-info to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup-0.0.0-py3.12.egg-info
+[2.199s] running install_scripts
+[2.392s] Installing laser_restamper script to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.392s] Installing odometry_node script to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.393s] Installing stm32_bridge script to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.393s] Installing teleop_keyboard script to /home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.393s] writing list of installed files to '/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/install.log'
+[2.485s] Invoked command in '/home/kanal-raspi5/ws_amr_robot/src/robot_bringup' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57528 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_bringup build --build-base /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/build install --record /home/kanal-raspi5/ws_amr_robot/build/robot_bringup/install.log --single-version-externally-managed install_data

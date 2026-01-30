@@ -7,7 +7,6 @@ class LaserRestamper(Node):
     def __init__(self):
         super().__init__('laser_restamper')
         
-        # 1. Listen to the raw data from the Lidar Driver
         self.scan_sub = self.create_subscription(
             LaserScan,
             '/scan',
@@ -15,22 +14,18 @@ class LaserRestamper(Node):
             10
         )
         
-        # 2. Prepare to publish the fixed data
         self.scan_pub = self.create_publisher(
             LaserScan,
             '/scan_restamped',
             10
         )
         
-        self.get_logger().info('Laser Restamper Active: Synchronizing timestamps...')
+        self.get_logger().info('Laser Restamper Active: Fixing Time & Frame ID...')
     
     def scan_callback(self, msg):
-        # Create a new empty message
         restamped_msg = LaserScan()
         
-        # Copy ALL data fields from the original message
-        # We want the distance data to stay exactly the same
-        restamped_msg.header = msg.header
+        # Copy data pengukuran (jarak)
         restamped_msg.angle_min = msg.angle_min
         restamped_msg.angle_max = msg.angle_max
         restamped_msg.angle_increment = msg.angle_increment
@@ -41,11 +36,13 @@ class LaserRestamper(Node):
         restamped_msg.ranges = msg.ranges
         restamped_msg.intensities = msg.intensities
         
-        # THE FIX: Overwrite the timestamp with the current system time
-        # This makes SLAM Toolbox think the data arrived "just now"
-        restamped_msg.header.stamp = self.get_clock().now().to_msg()
+        # 1. Paksa nama frame agar SESUAI dengan Static TF di launch file
+        restamped_msg.header.frame_id = 'laser_frame' 
         
-        # Send the fixed message
+        # 2. Paksa waktu menjadi Waktu Sekarang (System Time)
+        restamped_msg.header.stamp = self.get_clock().now().to_msg()
+        # ----------------
+        
         self.scan_pub.publish(restamped_msg)
 
 def main(args=None):

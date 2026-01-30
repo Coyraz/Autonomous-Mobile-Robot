@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from rclpy.duration import Duration # WAJIB IMPORT INI
+from rclpy.duration import Duration
 from std_msgs.msg import Int32MultiArray
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped, Quaternion
@@ -18,8 +18,8 @@ class OdometryNode(Node):
         self.ticks_per_rev = 4600.0
         
         # --- POLARITY ---
-        self.polarity_left = -1.0  
-        self.polarity_right = -1.0 
+        self.polarity_left = 1.0  
+        self.polarity_right = 1.0 
         
         # --- CONSTANTS ---
         self.m_per_tick = (math.pi * self.wheel_diameter) / self.ticks_per_rev
@@ -77,12 +77,9 @@ class OdometryNode(Node):
         self.publish_odometry()
 
     def publish_odometry(self):
-        # Ambil waktu sekarang
         now = self.get_clock().now()
         
-        # --- SOLUSI UTAMA: FUTURE DATING ---
-        # Tambahkan 0.1 detik ke depan agar TF selalu valid saat Lidar datang
-        future_time = now + Duration(seconds=0.1)
+        future_time = now + Duration(seconds=0.2)
         current_time_msg = future_time.to_msg()
         
         q = self.euler_to_quaternion(0, 0, self.theta)

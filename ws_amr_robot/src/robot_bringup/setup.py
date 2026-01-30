@@ -31,6 +31,7 @@ setup(
             'stm32_bridge = robot_bringup.stm32_bridge:main',
             'odometry_node = robot_bringup.odometry_node:main',
             'laser_restamper = robot_bringup.laser_restamper:main',
+	    'teleop_keyboard = robot_bringup.teleop_keyboard:main',
         ],
     },
 )

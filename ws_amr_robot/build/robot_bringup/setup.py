@@ -1,1 +1,0 @@
-/home/kanal-raspi5/ws_amr_robot/src/robot_bringup/setup.py
