@@ -1,7 +1,7 @@
 CMakeFiles/sllidar_node.dir/sdk/src/sl_serial_channel.cpp.o: \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/sdk/src/sl_serial_channel.cpp \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/sdk/src/sl_serial_channel.cpp \
  /usr/include/stdc-predef.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_driver.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_driver.h \
  /usr/include/c++/13/vector /usr/include/c++/13/bits/requires_hosted.h \
  /usr/include/aarch64-linux-gnu/c++/13/bits/c++config.h \
  /usr/include/aarch64-linux-gnu/c++/13/bits/os_defines.h \
@@ -126,13 +126,13 @@ CMakeFiles/sllidar_node.dir/sdk/src/sl_serial_channel.cpp.o: \
  /usr/include/aarch64-linux-gnu/bits/types/error_t.h \
  /usr/include/c++/13/bits/charconv.h \
  /usr/include/c++/13/bits/basic_string.tcc \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_cmd.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_protocol.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_types.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_cmd.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_protocol.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_types.h \
  /usr/include/c++/13/cstdint \
  /usr/lib/gcc/aarch64-linux-gnu/13/include/stdint.h /usr/include/stdint.h \
  /usr/include/aarch64-linux-gnu/bits/stdint-uintn.h \
  /usr/include/aarch64-linux-gnu/bits/stdint-least.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/sdk/src/hal/abs_rxtx.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/src/hal/types.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/sdk/src/hal/socket.h
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/sdk/src/hal/abs_rxtx.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/src/hal/types.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/sdk/src/hal/socket.h

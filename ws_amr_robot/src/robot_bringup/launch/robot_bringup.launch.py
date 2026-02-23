@@ -13,9 +13,6 @@ def generate_launch_description():
     slam_config_file = os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml')
     rviz_config_file = os.path.join(pkg_share, 'rviz', 'default.rviz')
     
-    # DEBUG: Cetak lokasi file config ke terminal agar kita yakin file ditemukan
-    print(f"Loading SLAM Config from: {slam_config_file}")
-
     # 3. PORT HARDWARE
     lidar_port = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
     
@@ -55,8 +52,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # SLAM TOOLBOX (PERBAIKAN)
-    # Node ini sekarang akan diurus oleh Lifecycle Manager
+    # SLAM TOOLBOX 
     slam_node = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
@@ -65,8 +61,7 @@ def generate_launch_description():
         parameters=[slam_config_file]
     )
 
-    # [BARU] Lifecycle Manager
-    # Tugasnya adalah menendang SLAM Toolbox agar bangun (Configure -> Activate)
+    # LIFECYCLE MANAGER (DIHIDUPKAN KEMBALI & DIJINAKKAN)
     lifecycle_node = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -75,7 +70,8 @@ def generate_launch_description():
         parameters=[
             {'use_sim_time': False},
             {'autostart': True},
-            {'node_names': ['slam_toolbox']}
+            {'node_names': ['slam_toolbox']},
+            {'bond_timeout': 60.0} 
         ]
     )
 
@@ -94,6 +90,6 @@ def generate_launch_description():
         lidar_launch,
         restamper_node,
         slam_node,
-        lifecycle_node, # Jangan lupa tambahkan ini
+        lifecycle_node, # Manager kembali bertugas
         rviz_node
     ])

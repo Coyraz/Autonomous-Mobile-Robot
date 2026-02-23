@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from rclpy.duration import Duration
 from std_msgs.msg import Int32MultiArray
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import TransformStamped, Quaternion
@@ -17,14 +16,14 @@ class OdometryNode(Node):
         self.wheel_base = 0.30
         self.ticks_per_rev = 4600.0
         
-        # --- POLARITY ---
+        # --- POLARITAS ---
         self.polarity_left = 1.0  
         self.polarity_right = 1.0 
         
-        # --- CONSTANTS ---
+        # --- KONSTANTA ---
         self.m_per_tick = (math.pi * self.wheel_diameter) / self.ticks_per_rev
 
-        # --- STATE ---
+        # --- STATE POSISI ---
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
@@ -33,7 +32,7 @@ class OdometryNode(Node):
         self.prev_right_ticks = 0
         self.initialized = False
 
-        # --- COMM ---
+        # --- KOMUNIKASI ROS 2 ---
         self.sub_enc = self.create_subscription(
             Int32MultiArray,
             'wheel_encoders',
@@ -41,9 +40,15 @@ class OdometryNode(Node):
             10
         )
         
+        # Kita kembalikan topik ke 'odom' murni, bukan 'odom_raw'
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         
+        # --- PERBAIKAN ARSITEKTURAL: HEARTBEAT TIMER 20Hz ---
+        # Timer ini menjamin TF dipublikasikan 20x sedetik, 
+        # melerai ketergantungan dari jeda komunikasi Serial USB STM32.
+        self.create_timer(0.05, self.publish_odometry)
+
         self.get_logger().info('Odometry Node Started.')
 
     def encoder_callback(self, msg):
@@ -74,13 +79,13 @@ class OdometryNode(Node):
         
         self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
 
-        self.publish_odometry()
+        # self.publish_odometry() # HAPUS ATAU KOMENTARI BARIS INI. Publikasi diambil alih oleh Timer.
 
     def publish_odometry(self):
+        # --- PERBAIKAN WAKTU: HAPUS MANIPULASI MASA DEPAN ---
+        # Wajib menggunakan waktu nyata agar sinkron dengan laser_restamper
         now = self.get_clock().now()
-        
-        future_time = now + Duration(seconds=0.2)
-        current_time_msg = future_time.to_msg()
+        current_time_msg = now.to_msg()
         
         q = self.euler_to_quaternion(0, 0, self.theta)
 
@@ -96,7 +101,7 @@ class OdometryNode(Node):
         
         self.tf_broadcaster.sendTransform(t)
 
-        # 2. Publish Topic (/odom)
+        # 2. SIARKAN TOPIK ODOMETRI
         odom = Odometry()
         odom.header.stamp = current_time_msg 
         odom.header.frame_id = 'odom'
@@ -105,8 +110,6 @@ class OdometryNode(Node):
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.orientation = q
-        
-        # Twist (Kecepatan) - Opsional, dikosongkan dulu agar ringan
         
         self.pub_odom.publish(odom)
 

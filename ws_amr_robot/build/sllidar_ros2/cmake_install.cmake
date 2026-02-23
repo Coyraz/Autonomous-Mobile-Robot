@@ -1,8 +1,8 @@
-# Install script for directory: /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2
+# Install script for directory: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
-  set(CMAKE_INSTALL_PREFIX "/home/kanal-raspi5/ws_amr_robot/install/sllidar_ros2")
+  set(CMAKE_INSTALL_PREFIX "/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2")
 endif()
 string(REGEX REPLACE "/$" "" CMAKE_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 
@@ -43,7 +43,7 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if(CMAKE_INSTALL_COMPONENT STREQUAL "Unspecified" OR NOT CMAKE_INSTALL_COMPONENT)
-  include("/home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2/ament_cmake_symlink_install/ament_cmake_symlink_install.cmake")
+  include("/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2/ament_cmake_symlink_install/ament_cmake_symlink_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -54,5 +54,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

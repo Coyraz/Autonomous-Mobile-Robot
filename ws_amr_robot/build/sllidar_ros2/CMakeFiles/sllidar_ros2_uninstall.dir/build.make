@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2
+CMAKE_SOURCE_DIR = /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2
+CMAKE_BINARY_DIR = /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2
 
 # Utility rule file for sllidar_ros2_uninstall.
 
@@ -67,7 +67,7 @@ include CMakeFiles/sllidar_ros2_uninstall.dir/compiler_depend.make
 include CMakeFiles/sllidar_ros2_uninstall.dir/progress.make
 
 CMakeFiles/sllidar_ros2_uninstall:
-	/usr/bin/cmake -P /home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
+	/usr/bin/cmake -P /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2/ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake
 
 sllidar_ros2_uninstall: CMakeFiles/sllidar_ros2_uninstall
 sllidar_ros2_uninstall: CMakeFiles/sllidar_ros2_uninstall.dir/build.make
@@ -82,6 +82,6 @@ CMakeFiles/sllidar_ros2_uninstall.dir/clean:
 .PHONY : CMakeFiles/sllidar_ros2_uninstall.dir/clean
 
 CMakeFiles/sllidar_ros2_uninstall.dir/depend:
-	cd /home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2 && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2 /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2 /home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2 /home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2 /home/kanal-raspi5/ws_amr_robot/build/sllidar_ros2/CMakeFiles/sllidar_ros2_uninstall.dir/DependInfo.cmake "--color=$(COLOR)"
+	cd /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2 && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2 /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2 /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2 /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2 /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2/CMakeFiles/sllidar_ros2_uninstall.dir/DependInfo.cmake "--color=$(COLOR)"
 .PHONY : CMakeFiles/sllidar_ros2_uninstall.dir/depend
 

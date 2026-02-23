@@ -1,10 +1,10 @@
 CMakeFiles/sllidar_node.dir/sdk/src/sl_crc.cpp.o: \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/sdk/src/sl_crc.cpp \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/sdk/src/sl_crc.cpp \
  /usr/include/stdc-predef.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_crc.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_cmd.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_protocol.h \
- /home/kanal-raspi5/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_types.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_crc.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_cmd.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_lidar_protocol.h \
+ /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2/./sdk/include/sl_types.h \
  /usr/include/c++/13/cstdint \
  /usr/include/aarch64-linux-gnu/c++/13/bits/c++config.h \
  /usr/include/aarch64-linux-gnu/c++/13/bits/os_defines.h \

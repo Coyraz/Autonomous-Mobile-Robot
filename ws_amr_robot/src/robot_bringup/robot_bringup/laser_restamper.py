@@ -2,25 +2,31 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
+from rclpy.qos import qos_profile_sensor_data # Hanya digunakan untuk mendengarkan Lidar
 
 class LaserRestamper(Node):
     def __init__(self):
         super().__init__('laser_restamper')
         
+        # 1. SUBSCRIBER: Mendengarkan Lidar asli.
+        # WAJIB menggunakan qos_profile_sensor_data (Best Effort) karena sllidar memancarkan Best Effort.
         self.scan_sub = self.create_subscription(
             LaserScan,
             '/scan',
             self.scan_callback,
-            10
+            qos_profile_sensor_data 
         )
         
+        # 2. PUBLISHER: Memancarkan data yang sudah distempel ulang.
+        # WAJIB menggunakan angka 10 (Reliable) karena SLAM Toolbox dan RViz 
+        # secara bawaan menuntut koneksi yang Reliable.
         self.scan_pub = self.create_publisher(
             LaserScan,
             '/scan_restamped',
-            10
+            10 
         )
         
-        self.get_logger().info('Laser Restamper Active: Fixing Time & Frame ID...')
+        self.get_logger().info('Laser Restamper Active: Translating QoS and Fixing Time...')
     
     def scan_callback(self, msg):
         restamped_msg = LaserScan()
