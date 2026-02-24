@@ -1,6 +1,13 @@
 package.xml
 setup.cfg
 setup.py
+../../build/robot_bringup/robot_bringup.egg-info/PKG-INFO
+../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt
+../../build/robot_bringup/robot_bringup.egg-info/dependency_links.txt
+../../build/robot_bringup/robot_bringup.egg-info/entry_points.txt
+../../build/robot_bringup/robot_bringup.egg-info/requires.txt
+../../build/robot_bringup/robot_bringup.egg-info/top_level.txt
+../../build/robot_bringup/robot_bringup.egg-info/zip-safe
 config/mapper_params_online_async.yaml
 launch/robot_bringup.launch.py
 resource/robot_bringup

@@ -1,0 +1,42 @@
+running develop
+Removing /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot-bringup.egg-link (link to .)
+running egg_info
+writing ../../build/robot_bringup/robot_bringup.egg-info/PKG-INFO
+writing dependency_links to ../../build/robot_bringup/robot_bringup.egg-info/dependency_links.txt
+writing entry points to ../../build/robot_bringup/robot_bringup.egg-info/entry_points.txt
+writing requirements to ../../build/robot_bringup/robot_bringup.egg-info/requires.txt
+writing top-level names to ../../build/robot_bringup/robot_bringup.egg-info/top_level.txt
+reading manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+writing manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+running build
+running build_py
+copying robot_bringup/teleop_keyboard.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+copying robot_bringup/odometry_node.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+copying robot_bringup/laser_restamper.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+running install
+running install_lib
+creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/teleop_keyboard.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/stm32_bridge.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/odometry_node.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/laser_restamper.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/__init__.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/teleop_keyboard.py to teleop_keyboard.cpython-312.pyc
+byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/stm32_bridge.py to stm32_bridge.cpython-312.pyc
+byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/odometry_node.py to odometry_node.cpython-312.pyc
+byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/laser_restamper.py to laser_restamper.cpython-312.pyc
+byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/__init__.py to __init__.cpython-312.pyc
+running install_data
+copying resource/robot_bringup -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index/packages
+copying package.xml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup
+copying launch/robot_bringup.launch.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+copying rviz/default.rviz -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/rviz
+copying config/mapper_params_online_async.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config
+running install_egg_info
+Copying ../../build/robot_bringup/robot_bringup.egg-info to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup-0.0.0-py3.12.egg-info
+running install_scripts
+Installing laser_restamper script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+Installing odometry_node script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+Installing stm32_bridge script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+Installing teleop_keyboard script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+writing list of installed files to '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/install.log'

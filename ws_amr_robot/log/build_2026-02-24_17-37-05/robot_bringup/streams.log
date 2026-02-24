@@ -1,0 +1,46 @@
+[1.760s] Invoking command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --uninstall --editable --build-directory /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build
+[2.733s] running develop
+[3.076s] Removing /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot-bringup.egg-link (link to .)
+[3.188s] Invoked command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --uninstall --editable --build-directory /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build
+[3.191s] Invoking command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/robot_bringup': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_bringup build --build-base /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build install --record /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/install.log --single-version-externally-managed install_data --force
+[3.629s] running egg_info
+[3.661s] writing ../../build/robot_bringup/robot_bringup.egg-info/PKG-INFO
+[3.662s] writing dependency_links to ../../build/robot_bringup/robot_bringup.egg-info/dependency_links.txt
+[3.662s] writing entry points to ../../build/robot_bringup/robot_bringup.egg-info/entry_points.txt
+[3.662s] writing requirements to ../../build/robot_bringup/robot_bringup.egg-info/requires.txt
+[3.662s] writing top-level names to ../../build/robot_bringup/robot_bringup.egg-info/top_level.txt
+[3.734s] reading manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+[3.735s] writing manifest file '../../build/robot_bringup/robot_bringup.egg-info/SOURCES.txt'
+[3.735s] running build
+[3.735s] running build_py
+[3.736s] copying robot_bringup/teleop_keyboard.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+[3.737s] copying robot_bringup/odometry_node.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+[3.737s] copying robot_bringup/laser_restamper.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup
+[3.738s] running install
+[3.752s] running install_lib
+[3.784s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[3.784s] copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/teleop_keyboard.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[3.784s] copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/stm32_bridge.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[3.784s] copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/odometry_node.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[3.784s] copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/laser_restamper.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[3.785s] copying /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build/lib/robot_bringup/__init__.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup
+[3.785s] byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/teleop_keyboard.py to teleop_keyboard.cpython-312.pyc
+[3.787s] byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/stm32_bridge.py to stm32_bridge.cpython-312.pyc
+[3.789s] byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/odometry_node.py to odometry_node.cpython-312.pyc
+[3.790s] byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/laser_restamper.py to laser_restamper.cpython-312.pyc
+[3.791s] byte-compiling /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup/__init__.py to __init__.cpython-312.pyc
+[3.791s] running install_data
+[3.791s] copying resource/robot_bringup -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index/packages
+[3.792s] copying package.xml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup
+[3.792s] copying launch/robot_bringup.launch.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[3.792s] copying rviz/default.rviz -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/rviz
+[3.792s] copying config/mapper_params_online_async.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config
+[3.792s] running install_egg_info
+[3.821s] Copying ../../build/robot_bringup/robot_bringup.egg-info to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot_bringup-0.0.0-py3.12.egg-info
+[3.822s] running install_scripts
+[4.069s] Installing laser_restamper script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[4.070s] Installing odometry_node script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[4.070s] Installing stm32_bridge script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[4.071s] Installing teleop_keyboard script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[4.071s] writing list of installed files to '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/install.log'
+[4.214s] Invoked command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/robot_bringup' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/robot_bringup build --build-base /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build install --record /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/install.log --single-version-externally-managed install_data --force

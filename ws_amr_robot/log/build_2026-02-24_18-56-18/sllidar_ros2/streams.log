@@ -1,0 +1,70 @@
+[0.418s] Invoking command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup:/home/kanal-raspi5/install/robot_bringup:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 /usr/bin/cmake /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2 -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2
+[0.448s] -- Found ament_cmake: 2.5.5 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.852s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.864s] -- Found rclcpp: 28.1.16 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.906s] -- Found rosidl_generator_c: 4.6.7 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.929s] -- Found rosidl_generator_cpp: 4.6.7 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.947s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.979s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.137s] -- Found rmw_implementation_cmake: 7.3.3 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[1.138s] -- Found rmw_fastrtps_cpp: 8.4.3 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[1.322s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[1.515s] -- Found sensor_msgs: 5.3.6 (/opt/ros/jazzy/share/sensor_msgs/cmake)
+[1.640s] -- Found std_srvs: 5.3.6 (/opt/ros/jazzy/share/std_srvs/cmake)
+[1.992s] -- Configuring done (1.6s)
+[2.042s] -- Generating done (0.0s)
+[2.055s] -- Build files have been written to: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2
+[2.075s] Invoked command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup:/home/kanal-raspi5/install/robot_bringup:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 /usr/bin/cmake /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/src/sllidar_ros2 -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2
+[2.078s] Invoking command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup:/home/kanal-raspi5/install/robot_bringup:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 /usr/bin/cmake --build /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2 -- -j4 -l4
+[2.203s] [ 10%] Built target sllidar_client
+[2.230s] [100%] Built target sllidar_node
+[2.258s] Invoked command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup:/home/kanal-raspi5/install/robot_bringup:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 /usr/bin/cmake --build /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2 -- -j4 -l4
+[2.277s] Invoking command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup:/home/kanal-raspi5/install/robot_bringup:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 /usr/bin/cmake --install /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2
+[2.291s] -- Install configuration: ""
+[2.292s] -- Execute custom install script
+[2.292s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/.~lock.sllidar_a1_launch.py#
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_a1_launch.py
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_a2m12_launch .py
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_a2m7_launch.py
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_a2m8_launch.py
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_a3_launch.py
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_c1_launch.py
+[2.293s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_s1_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_s1_tcp_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_s2_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_s2e_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_s3_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/sllidar_t1_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_a1_launch.py
+[2.294s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_a2m12_launch.py
+[2.295s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_a2m7_launch.py
+[2.295s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_a2m8_launch.py
+[2.295s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_a3_launch.py
+[2.295s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_c1_launch.py
+[2.295s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_s1_launch.py
+[2.298s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_s1_tcp_launch.py
+[2.298s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_s2_launch.py
+[2.298s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_s2e_launch.py
+[2.298s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_s3_launch.py
+[2.298s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/launch/view_sllidar_t1_launch.py
+[2.298s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/rviz/sllidar_ros2.rviz
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/lib/sllidar_ros2/sllidar_node
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/lib/sllidar_ros2/sllidar_client
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/ament_index/resource_index/package_run_dependencies/sllidar_ros2
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/ament_index/resource_index/parent_prefix_path/sllidar_ros2
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/environment/ament_prefix_path.sh
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/environment/ament_prefix_path.dsv
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/environment/path.sh
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/environment/path.dsv
+[2.299s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/local_setup.bash
+[2.301s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/local_setup.sh
+[2.301s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/local_setup.zsh
+[2.301s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/local_setup.dsv
+[2.301s] -- Symlinking: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/package.dsv
+[2.321s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/ament_index/resource_index/packages/sllidar_ros2
+[2.321s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/cmake/ament_cmake_export_dependencies-extras.cmake
+[2.321s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/cmake/ament_cmake_export_include_directories-extras.cmake
+[2.321s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/cmake/sllidar_ros2Config.cmake
+[2.321s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/cmake/sllidar_ros2Config-version.cmake
+[2.322s] -- Up-to-date symlink: /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/sllidar_ros2/share/sllidar_ros2/package.xml
+[2.325s] Invoked command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup:/home/kanal-raspi5/install/robot_bringup:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.78.101.29 57883 100.82.208.104 4000 /usr/bin/cmake --install /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2

@@ -13,12 +13,14 @@ class OdometryNode(Node):
 
         # --- KONFIGURASI FISIK ---
         self.wheel_diameter = 0.068
-        self.wheel_base = 0.30
+        self.wheel_base = 0.292
         self.ticks_per_rev = 4600.0
         
-        # --- POLARITAS ---
+        # --- PERBAIKAN FATAL: POLARITAS DIBALIK ---
+        # Mengubah 1.0 menjadi -1.0 untuk membalikkan logika pembacaan arah.
+        # Ini akan memaksa sistem mengalikan data mundur dari roda menjadi data maju di RViz.
         self.polarity_left = 1.0  
-        self.polarity_right = 1.0 
+        self.polarity_right = -1.0 
         
         # --- KONSTANTA ---
         self.m_per_tick = (math.pi * self.wheel_diameter) / self.ticks_per_rev
@@ -40,16 +42,13 @@ class OdometryNode(Node):
             10
         )
         
-        # Kita kembalikan topik ke 'odom' murni, bukan 'odom_raw'
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         
-        # --- PERBAIKAN ARSITEKTURAL: HEARTBEAT TIMER 20Hz ---
-        # Timer ini menjamin TF dipublikasikan 20x sedetik, 
-        # melerai ketergantungan dari jeda komunikasi Serial USB STM32.
+        # --- DETAK JANTUNG (HEARTBEAT) 20Hz ---
         self.create_timer(0.05, self.publish_odometry)
-
-        self.get_logger().info('Odometry Node Started.')
+        
+        self.get_logger().info('Odometry Node Started with Corrected Polarity.')
 
     def encoder_callback(self, msg):
         current_left = msg.data[0] * self.polarity_left
@@ -79,17 +78,13 @@ class OdometryNode(Node):
         
         self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
 
-        # self.publish_odometry() # HAPUS ATAU KOMENTARI BARIS INI. Publikasi diambil alih oleh Timer.
-
     def publish_odometry(self):
-        # --- PERBAIKAN WAKTU: HAPUS MANIPULASI MASA DEPAN ---
-        # Wajib menggunakan waktu nyata agar sinkron dengan laser_restamper
         now = self.get_clock().now()
         current_time_msg = now.to_msg()
         
         q = self.euler_to_quaternion(0, 0, self.theta)
 
-        # 1. Publish TF (odom -> base_link)
+        # 1. SIARKAN TF (odom -> base_link)
         t = TransformStamped()
         t.header.stamp = current_time_msg
         t.header.frame_id = 'odom'

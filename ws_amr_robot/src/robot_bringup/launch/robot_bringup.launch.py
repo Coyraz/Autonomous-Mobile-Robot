@@ -1,23 +1,18 @@
 import os
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
-    # 1. AMBIL LOKASI PAKET
     pkg_share = get_package_share_directory('robot_bringup')
     
-    # 2. DEFINISI FILE CONFIG (MUTLAK)
     slam_config_file = os.path.join(pkg_share, 'config', 'mapper_params_online_async.yaml')
     rviz_config_file = os.path.join(pkg_share, 'rviz', 'default.rviz')
     
-    # 3. PORT HARDWARE
     lidar_port = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
     
-    # --- NODE ---
-
     bridge_node = Node(
         package='robot_bringup',
         executable='stm32_bridge',
@@ -52,7 +47,6 @@ def generate_launch_description():
         output='screen'
     )
 
-    # SLAM TOOLBOX 
     slam_node = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
@@ -61,7 +55,8 @@ def generate_launch_description():
         parameters=[slam_config_file]
     )
 
-    # LIFECYCLE MANAGER (DIHIDUPKAN KEMBALI & DIJINAKKAN)
+    # LIFECYCLE MANAGER: DIPERTAHANKAN UNTUK MEMBANGUNKAN SLAM
+    # TETAPI SISTEM PEMBUNUHNYA (BOND) DIMATIKAN TOTAL
     lifecycle_node = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -71,7 +66,8 @@ def generate_launch_description():
             {'use_sim_time': False},
             {'autostart': True},
             {'node_names': ['slam_toolbox']},
-            {'bond_timeout': 60.0} 
+            {'attempt_establishing_bonds': False}, # KUNCI ABSOLUT: Matikan pengawasan detak jantung
+            {'bond_timeout': 0.0} # Nonaktifkan timer pembunuh
         ]
     )
 
@@ -90,6 +86,6 @@ def generate_launch_description():
         lidar_launch,
         restamper_node,
         slam_node,
-        lifecycle_node, # Manager kembali bertugas
+        lifecycle_node,
         rviz_node
     ])
