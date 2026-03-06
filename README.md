@@ -21,3 +21,7 @@ for running the ros2 node:
 for running the teleop:
 
     ros2 run robot_bringup teleop_keyboard
+
+for see the map visualization using FOXGLOVE (Chrome):
+
+    ros2 run foxglove_bridge foxglove_bridge
