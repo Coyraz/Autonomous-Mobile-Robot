@@ -25,3 +25,11 @@ for running the teleop:
 for see the map visualization using FOXGLOVE (Chrome):
 
     ros2 run foxglove_bridge foxglove_bridge
+
+for outputing the map after visualization:
+
+    cd Autonomous-Mobile-Robot/ws_amr_robot
+    source install/setup.bash
+    cd src/robot_bringup/maps
+    ros2 run nav2_map_server map_saver_cli -t /map -f nama_peta_anda
+    
