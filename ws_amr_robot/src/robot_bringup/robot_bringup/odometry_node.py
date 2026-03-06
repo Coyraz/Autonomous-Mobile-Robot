@@ -3,8 +3,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int32MultiArray
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import TransformStamped, Quaternion
-from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import Quaternion
 import math
 
 class OdometryNode(Node):
@@ -13,12 +12,10 @@ class OdometryNode(Node):
 
         # --- KONFIGURASI FISIK ---
         self.wheel_diameter = 0.068
-        self.wheel_base = 0.292
+        self.wheel_base = 0.292 
         self.ticks_per_rev = 4600.0
         
-        # --- PERBAIKAN FATAL: POLARITAS DIBALIK ---
-        # Mengubah 1.0 menjadi -1.0 untuk membalikkan logika pembacaan arah.
-        # Ini akan memaksa sistem mengalikan data mundur dari roda menjadi data maju di RViz.
+        # --- POLARITAS (Sesuai data empiris terakhir) ---
         self.polarity_left = 1.0  
         self.polarity_right = -1.0 
         
@@ -34,7 +31,6 @@ class OdometryNode(Node):
         self.prev_right_ticks = 0
         self.initialized = False
 
-        # --- KOMUNIKASI ROS 2 ---
         self.sub_enc = self.create_subscription(
             Int32MultiArray,
             'wheel_encoders',
@@ -42,13 +38,15 @@ class OdometryNode(Node):
             10
         )
         
-        self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
-        self.tf_broadcaster = TransformBroadcaster(self)
+        # [KUNCI ABSOLUT 1] Mengirim ke 'odom_raw' agar disedot oleh ekf_node
+        self.pub_odom = self.create_publisher(Odometry, 'odom_raw', 10)
         
-        # --- DETAK JANTUNG (HEARTBEAT) 20Hz ---
+        # [KUNCI ABSOLUT 2] tf_broadcaster DIHAPUS TOTAL.
+        # Odometry tidak lagi berhak membuat TF. Hak itu kini milik EKF.
+        
         self.create_timer(0.05, self.publish_odometry)
         
-        self.get_logger().info('Odometry Node Started with Corrected Polarity.')
+        self.get_logger().info('Odometry Node Started. Mode RAW untuk diumpankan ke EKF.')
 
     def encoder_callback(self, msg):
         current_left = msg.data[0] * self.polarity_left
@@ -84,19 +82,6 @@ class OdometryNode(Node):
         
         q = self.euler_to_quaternion(0, 0, self.theta)
 
-        # 1. SIARKAN TF (odom -> base_link)
-        t = TransformStamped()
-        t.header.stamp = current_time_msg
-        t.header.frame_id = 'odom'
-        t.child_frame_id = 'base_link'
-        t.transform.translation.x = self.x
-        t.transform.translation.y = self.y
-        t.transform.translation.z = 0.0
-        t.transform.rotation = q
-        
-        self.tf_broadcaster.sendTransform(t)
-
-        # 2. SIARKAN TOPIK ODOMETRI
         odom = Odometry()
         odom.header.stamp = current_time_msg 
         odom.header.frame_id = 'odom'
@@ -106,6 +91,17 @@ class OdometryNode(Node):
         odom.pose.pose.position.y = self.y
         odom.pose.pose.orientation = q
         
+        # [KUNCI ABSOLUT 3] Matriks Kovariansi Wajib. EKF menolak data kosong.
+        # Kita set X rendah (dipercaya), dan Yaw tinggi (tidak dipercaya karena selip)
+        odom.pose.covariance[0] = 0.05   # Kepastian X
+        odom.pose.covariance[7] = 0.05   # Kepastian Y
+        odom.pose.covariance[35] = 10.0  # Ketidakpastian Yaw (Rotasi roda diabaikan)
+        
+        odom.twist.twist.linear.x = 0.0
+        odom.twist.twist.angular.z = 0.0
+        odom.twist.covariance[0] = 0.05
+        odom.twist.covariance[35] = 10.0
+
         self.pub_odom.publish(odom)
 
     def euler_to_quaternion(self, roll, pitch, yaw):

@@ -2,14 +2,14 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from rclpy.qos import qos_profile_sensor_data # Hanya digunakan untuk mendengarkan Lidar
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.duration import Duration
 
 class LaserRestamper(Node):
     def __init__(self):
         super().__init__('laser_restamper')
         
-        # 1. SUBSCRIBER: Mendengarkan Lidar asli.
-        # WAJIB menggunakan qos_profile_sensor_data (Best Effort) karena sllidar memancarkan Best Effort.
+        # 1. SUBSCRIBER: Mendengarkan Lidar asli (Best Effort)
         self.scan_sub = self.create_subscription(
             LaserScan,
             '/scan',
@@ -17,21 +17,19 @@ class LaserRestamper(Node):
             qos_profile_sensor_data 
         )
         
-        # 2. PUBLISHER: Memancarkan data yang sudah distempel ulang.
-        # WAJIB menggunakan angka 10 (Reliable) karena SLAM Toolbox dan RViz 
-        # secara bawaan menuntut koneksi yang Reliable.
+        # 2. PUBLISHER: Memancarkan data yang sudah distempel ulang (Reliable)
         self.scan_pub = self.create_publisher(
             LaserScan,
             '/scan_restamped',
             10 
         )
         
-        self.get_logger().info('Laser Restamper Active: Translating QoS and Fixing Time...')
+        self.get_logger().info('Laser Restamper Active: BACKDATING time by 500ms for Slow EKF Sync...')
     
     def scan_callback(self, msg):
         restamped_msg = LaserScan()
         
-        # Copy data pengukuran (jarak)
+        # Menyalin murni data fisik laser
         restamped_msg.angle_min = msg.angle_min
         restamped_msg.angle_max = msg.angle_max
         restamped_msg.angle_increment = msg.angle_increment
@@ -42,12 +40,18 @@ class LaserRestamper(Node):
         restamped_msg.ranges = msg.ranges
         restamped_msg.intensities = msg.intensities
         
-        # 1. Paksa nama frame agar SESUAI dengan Static TF di launch file
+        # 1. Menyelaraskan nama bingkai spasial
         restamped_msg.header.frame_id = 'laser_frame' 
         
-        # 2. Paksa waktu menjadi Waktu Sekarang (System Time)
-        restamped_msg.header.stamp = self.get_clock().now().to_msg()
-        # ----------------
+        # --- [OPERASI BEDAH MUTLAK: EKSTREMASI TIME BACKDATING] ---
+        # Mengompensasi CPU Raspberry Pi yang tersedak. EKF butuh >300ms untuk berpikir.
+        # Kita memundurkan waktu Lidar sebanyak 500 milidetik (0.5 detik) ke masa lalu.
+        now = self.get_clock().now()
+        offset = Duration(seconds=0, nanoseconds=500000000) # 500 ms
+        past_time = now - offset
+        
+        restamped_msg.header.stamp = past_time.to_msg()
+        # -----------------------------------------------
         
         self.scan_pub.publish(restamped_msg)
 
@@ -58,8 +62,9 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    node.destroy_node()
-    rclpy.shutdown()
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

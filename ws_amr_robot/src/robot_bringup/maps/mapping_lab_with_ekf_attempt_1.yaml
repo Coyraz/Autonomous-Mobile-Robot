@@ -1,0 +1,7 @@
+image: mapping_lab_with_ekf_attempt_1.pgm
+mode: trinary
+resolution: 0.050
+origin: [-9.382, -6.907, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196

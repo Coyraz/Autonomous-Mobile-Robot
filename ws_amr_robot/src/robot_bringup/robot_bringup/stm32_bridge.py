@@ -5,6 +5,7 @@ import serial
 import json
 from std_msgs.msg import Int32MultiArray
 from geometry_msgs.msg import Twist
+from sensor_msgs.msg import Imu  # [TAMBAHAN MUTLAK] Import standar pesan inersia ROS 2
 
 class STM32Bridge(Node):
     def __init__(self):
@@ -30,10 +31,11 @@ class STM32Bridge(Node):
         self.total_right_ticks = 0
         self.is_first_message = True
         
-        # Publisher for encoder data
+        # --- PUBLISHERS ---
         self.encoder_pub = self.create_publisher(Int32MultiArray, '/wheel_encoders', 10)
+        self.imu_pub = self.create_publisher(Imu, '/imu/data_raw', 10) # [TAMBAHAN] Publisher data inersia
         
-        # Subscriber for velocity commands
+        # --- SUBSCRIBERS ---
         self.cmd_vel_sub = self.create_subscription(
             Twist,
             '/cmd_vel',
@@ -45,10 +47,10 @@ class STM32Bridge(Node):
         self.current_v = 0  # mm/s
         self.current_w = 0  # mrad/s
         
-        # Timer at 10Hz (slower = more stable)
-        self.timer = self.create_timer(0.1, self.timer_callback)
+        # [PERBAIKAN KRITIS] Dipercepat ke 20Hz untuk mencegah penumpukan bufer (bottle-neck)
+        self.timer = self.create_timer(0.05, self.timer_callback)
         
-        self.get_logger().info('STM32 Bridge Active (Read + Write)')
+        self.get_logger().info('STM32 Bridge Active (Read Encoders+IMU, Write Cmd_Vel)')
     
     def calculate_delta(self, current, previous):
         """Calculate delta with 16-bit overflow handling"""
@@ -69,7 +71,7 @@ class STM32Bridge(Node):
         self.current_w = max(-2000, min(2000, self.current_w))
     
     def timer_callback(self):
-        """Combined read encoder + write command at 10Hz"""
+        """Combined write command + read encoder + IMU data"""
         
         # 1. Send command to STM32
         try:
@@ -79,45 +81,75 @@ class STM32Bridge(Node):
             self.get_logger().error(f'Send error: {e}')
             return
         
-        # 2. Read encoder data from STM32
+        # 2. Read data from STM32
         try:
-            if self.ser.in_waiting > 0:
+            latest_line = None
+            
+            # [PERBAIKAN LOGIKA] Menguras seluruh antrean bufer serial.
+            # Mengeliminasi latensi dengan hanya menyimpan string yang paling baru diterima.
+            while self.ser.in_waiting > 0:
                 line = self.ser.readline().decode('utf-8', errors='ignore').strip()
-                
                 if line.startswith('{') and line.endswith('}'):
-                    try:
-                        data = json.loads(line)
+                    latest_line = line
+                    
+            if latest_line is not None:
+                try:
+                    data = json.loads(latest_line)
+                    
+                    # --- A. OLAH DATA ENCODER ---
+                    if 'l' in data and 'r' in data:
+                        raw_left = data['l']
+                        raw_right = data['r']
                         
-                        if 'l' in data and 'r' in data:
-                            raw_left = data['l']
-                            raw_right = data['r']
-                            
-                            # Initialize on first run
-                            if self.is_first_message:
-                                self.prev_left_raw = raw_left
-                                self.prev_right_raw = raw_right
-                                self.is_first_message = False
-                                return
-                            
-                            # Calculate change since last read
-                            delta_left = self.calculate_delta(raw_left, self.prev_left_raw)
-                            delta_right = self.calculate_delta(raw_right, self.prev_right_raw)
-                            
-                            # Update totals
-                            self.total_left_ticks += delta_left
-                            self.total_right_ticks += delta_right
-                            
-                            # Save current raw values
+                        if self.is_first_message:
                             self.prev_left_raw = raw_left
                             self.prev_right_raw = raw_right
-                            
-                            # Publish encoder data
-                            msg = Int32MultiArray()
-                            msg.data = [self.total_left_ticks, self.total_right_ticks]
-                            self.encoder_pub.publish(msg)
-                            
-                    except json.JSONDecodeError:
-                        pass
+                            self.is_first_message = False
+                            return
+                        
+                        delta_left = self.calculate_delta(raw_left, self.prev_left_raw)
+                        delta_right = self.calculate_delta(raw_right, self.prev_right_raw)
+                        
+                        self.total_left_ticks += delta_left
+                        self.total_right_ticks += delta_right
+                        
+                        self.prev_left_raw = raw_left
+                        self.prev_right_raw = raw_right
+                        
+                        msg_enc = Int32MultiArray()
+                        msg_enc.data = [self.total_left_ticks, self.total_right_ticks]
+                        self.encoder_pub.publish(msg_enc)
+                        
+                    # --- B. OLAH DATA IMU ---
+                    # Menangkap variabel giroskop dan akselerometer jika ada di dalam JSON
+                    if 'gz' in data:
+                        imu_msg = Imu()
+                        imu_msg.header.stamp = self.get_clock().now().to_msg()
+                        imu_msg.header.frame_id = 'base_link' # Mengikat orientasi ini ke badan robot
+                        
+                        # Transformasi Satuan Fisika Dasar
+                        # Gyro Z: mili-radian per detik -> radian per detik
+                        imu_msg.angular_velocity.z = float(data['gz']) / 1000.0
+                        
+                        # Accel: cm per detik kuadrat -> meter per detik kuadrat
+                        imu_msg.linear_acceleration.x = float(data.get('ax', 0)) / 100.0
+                        imu_msg.linear_acceleration.y = float(data.get('ay', 0)) / 100.0
+                        imu_msg.linear_acceleration.z = float(data.get('az', 980)) / 100.0
+                        
+                        # Deklarasi Matriks Kovariansi (Kepercayaan Data)
+                        # Dibutuhkan mutlak agar EKF tidak menolak data ini
+                        imu_msg.angular_velocity_covariance[8] = 0.005 
+                        imu_msg.linear_acceleration_covariance[0] = 0.05
+                        imu_msg.linear_acceleration_covariance[4] = 0.05
+                        imu_msg.linear_acceleration_covariance[8] = 0.05
+                        
+                        # Mematikan validasi orientasi absolut (karena MPU6050 tidak punya kompas)
+                        imu_msg.orientation_covariance[0] = -1.0 
+                        
+                        self.imu_pub.publish(imu_msg)
+                        
+                except json.JSONDecodeError:
+                    pass
                         
         except Exception as e:
             self.get_logger().error(f'Read error: {e}')

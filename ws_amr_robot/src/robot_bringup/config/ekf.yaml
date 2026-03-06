@@ -1,0 +1,38 @@
+ekf_filter_node:
+  ros__parameters:
+    # Frekuensi fusi matriks (20Hz menyesuaikan kecepatan masuknya data dari STM32)
+    frequency: 20.0
+    
+    # Mode 2D aktif mutlak karena robot tidak terbang (Z, Roll, Pitch diabaikan)
+    two_d_mode: true
+    
+    # EKF akan mengambil alih tugas menyiarkan TF dari odom ke base_link
+    publish_tf: true
+    
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # --- KONFIGURASI SUMBER 1: ODOMETRI RODA ---
+    odom0: /odom_raw
+    # Matriks Konfigurasi [X, Y, Z, Roll, Pitch, Yaw, Vx, Vy, Vz, VRoll, VPitch, VYaw, Ax, Ay, Az]
+    # Kita HANYA mempercayai kecepatan translasi maju (Vx) dari roda.
+    # Kita TIDAK mempercayai rotasi (Yaw) dari roda karena rentan selip.
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, false,
+                   false, false, false]
+
+    # --- KONFIGURASI SUMBER 2: IMU ---
+    imu0: /imu/data_raw
+    # Kita HANYA mempercayai kecepatan rotasi (VYaw) dari giroskop.
+    # Kita mengabaikan orientasi absolut karena MPU6050 tidak memiliki kompas (magnetometer).
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+                  
+    imu0_remove_gravitational_acceleration: true
