@@ -1,0 +1,43 @@
+[1.567s] Invoking command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.75.64.14 44100 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build --no-deps symlink_data
+[2.109s] running develop
+[2.422s] running egg_info
+[2.422s] creating robot_bringup.egg-info
+[2.453s] writing robot_bringup.egg-info/PKG-INFO
+[2.454s] writing dependency_links to robot_bringup.egg-info/dependency_links.txt
+[2.454s] writing entry points to robot_bringup.egg-info/entry_points.txt
+[2.454s] writing requirements to robot_bringup.egg-info/requires.txt
+[2.454s] writing top-level names to robot_bringup.egg-info/top_level.txt
+[2.454s] writing manifest file 'robot_bringup.egg-info/SOURCES.txt'
+[2.509s] reading manifest file 'robot_bringup.egg-info/SOURCES.txt'
+[2.510s] writing manifest file 'robot_bringup.egg-info/SOURCES.txt'
+[2.544s] running build_ext
+[2.544s] Creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages/robot-bringup.egg-link (link to .)
+[2.545s] Installing laser_restamper script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.546s] Installing odometry_node script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.546s] Installing stm32_bridge script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.546s] Installing teleop_keyboard script to /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/robot_bringup
+[2.546s] 
+[2.546s] Installed /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup
+[2.546s] running symlink_data
+[2.547s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/ament_index
+[2.547s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index
+[2.547s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index/packages
+[2.547s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/resource/robot_bringup -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/ament_index/resource_index/packages
+[2.547s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/package.xml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup
+[2.547s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.547s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/launch/hardware.launch.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.547s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/launch/navigation.launch.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.547s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/launch/robot_bringup.launch.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.548s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/launch/mapping.launch.py -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/launch
+[2.548s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/rviz
+[2.548s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/rviz/default.rviz -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/rviz
+[2.548s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config
+[2.548s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/config/ekf.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config
+[2.548s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/config/nav2_params.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config
+[2.548s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/config/mapper_params_online_async.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config
+[2.548s] creating /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/maps
+[2.549s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/maps/mapping_lab_with_ekf_attempt_2.pgm -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/maps
+[2.549s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/maps/mapping_lab_with_ekf_attempt_1.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/maps
+[2.549s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/maps/mapping_lab_with_ekf_attempt_1.pgm -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/maps
+[2.549s] symbolically linking /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/maps/mapping_lab_with_ekf_attempt_2.yaml -> /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/maps
+[2.659s] Invoked command in '/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup' returned '0': DEBUGINFOD_URLS=https://debuginfod.ubuntu.com NX_CONNECTION=100.75.64.14 44100 100.82.208.104 4000 PYTHONPATH=/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/lib/python3.12/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/robot_bringup/build --no-deps symlink_data

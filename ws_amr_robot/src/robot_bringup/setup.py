@@ -18,6 +18,8 @@ setup(
         (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
         # Include konfigurasi SLAM (YAML) - Wajib agar tidak error path
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        # [PERBAIKAN MUTLAK] Include folder maps agar peta disalin ke ruang eksekusi
+        (os.path.join('share', package_name, 'maps'), glob('maps/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -31,7 +33,7 @@ setup(
             'stm32_bridge = robot_bringup.stm32_bridge:main',
             'odometry_node = robot_bringup.odometry_node:main',
             'laser_restamper = robot_bringup.laser_restamper:main',
-	    'teleop_keyboard = robot_bringup.teleop_keyboard:main',
+            'teleop_keyboard = robot_bringup.teleop_keyboard:main',
         ],
     },
 )

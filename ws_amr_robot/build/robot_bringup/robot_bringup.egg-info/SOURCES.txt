@@ -3,7 +3,15 @@ setup.cfg
 setup.py
 config/ekf.yaml
 config/mapper_params_online_async.yaml
+config/nav2_params.yaml
+launch/hardware.launch.py
+launch/mapping.launch.py
+launch/navigation.launch.py
 launch/robot_bringup.launch.py
+maps/mapping_lab_with_ekf_attempt_1.pgm
+maps/mapping_lab_with_ekf_attempt_1.yaml
+maps/mapping_lab_with_ekf_attempt_2.pgm
+maps/mapping_lab_with_ekf_attempt_2.yaml
 resource/robot_bringup
 robot_bringup/__init__.py
 robot_bringup/laser_restamper.py
