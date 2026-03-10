@@ -18,6 +18,18 @@ for running the ros2 node:
     
     ros2 launch robot_bringup robot_bringup.launch.py
 
+for initialization, either for mapping, or nagiating use:
+
+    ros2 launch robot_bringup hardware.launch.py
+
+for running the mapping (SLAM) function:
+
+    ros2 launch robot_bringup mapping.launch.py
+
+for running the autonomous navigation (NAV) function:
+
+    ros2 launch robot_bringup navigation.launch.py
+
 for running the teleop:
 
     ros2 run robot_bringup teleop_keyboard
