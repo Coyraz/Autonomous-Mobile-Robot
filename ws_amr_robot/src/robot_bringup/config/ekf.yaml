@@ -1,14 +1,8 @@
 ekf_filter_node:
   ros__parameters:
-    # Frekuensi fusi matriks (20Hz menyesuaikan kecepatan masuknya data dari STM32 & RF2O)
     frequency: 20.0
-    
-    # Mode 2D aktif mutlak karena robot tidak terbang (Z, Roll, Pitch diabaikan)
     two_d_mode: true
-    
-    # EKF mengambil alih tugas menyiarkan TF dari odom ke base_link
     publish_tf: true
-    
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
@@ -18,13 +12,13 @@ ekf_filter_node:
     # SAKSI UTAMA (PRIORITAS TERTINGGI): ODOMETRI LASER (RF2O)
     # ========================================================================
     odom0: /odom_rf2o
-    # Matriks Konfigurasi [X, Y, Z, Roll, Pitch, Yaw, Vx, Vy, Vz, VRoll, VPitch, VYaw, Ax, Ay, Az]
-    # KITA MEMPERCAYAI posisi absolut 2D (X, Y) dan orientasi (Yaw) dari pencocokan siluet LiDAR.
-    # Ini adalah mata robot Anda yang mengoreksi semua selip mekanis.
+    # REVISI ABSOLUT: 
+    # Mengaktifkan X, Y, Yaw (Posisi) DAN Vx, Vy, VYaw (Kecepatan).
+    # Jika roda selip (Vx Roda = 0.5), RF2O akan membantahnya (Vx RF2O = 0.0).
     odom0_config: [true,  true,  false,
                    false, false, true,
-                   false, false, false,
-                   false, false, false,
+                   true,  true,  false,
+                   false, false, true,
                    false, false, false]
     odom0_differential: false
 
@@ -32,9 +26,8 @@ ekf_filter_node:
     # SAKSI CADANGAN (REDUNDANSI): ODOMETRI RODA (ENCODER)
     # ========================================================================
     odom1: /odom_raw
-    # KITA TIDAK MEMPERCAYAI posisi absolut roda karena bukti empiris eror selip 6.91%.
-    # Kita HANYA mempercayai kecepatan translasi maju sesaat (Vx) dan kecepatan sudut (VYaw) 
-    # untuk mengisi kekosongan data jika LiDAR mendadak buta.
+    # Tetap membiarkan roda melaporkan Vx dan VYaw sebagai penyokong, 
+    # namun kini kesaksiannya akan diadu langsung dengan kesaksian kecepatan RF2O.
     odom1_config: [false, false, false,
                    false, false, false,
                    true,  false, false,
@@ -46,11 +39,10 @@ ekf_filter_node:
     # SAKSI INERSIA: IMU
     # ========================================================================
     imu0: /imu/data_raw
-    # Kita HANYA mempercayai kecepatan rotasi (VYaw) dari giroskop MPU6050.
-    # Orientasi absolut diabaikan karena absennya kompas (magnetometer).
+    # IMU tetap menjadi hakim tertinggi untuk rotasi mendadak (VYaw).
     imu0_config: [false, false, false,
-                  false, false, false,
-                  false, false, false,
-                  false, false, true,
-                  false, false, false]
+                   false, false, false,
+                   false, false, false,
+                   false, false, true,
+                   false, false, false]
     imu0_remove_gravitational_acceleration: true

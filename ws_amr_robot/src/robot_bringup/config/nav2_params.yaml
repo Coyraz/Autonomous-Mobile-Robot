@@ -38,7 +38,7 @@ controller_server:
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
-    failure_tolerance: 3.0
+    failure_tolerance: 10.0
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"]
     controller_plugins: ["FollowPath"]
@@ -108,7 +108,7 @@ planner_server:
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"
       tolerance: 0.5
-      use_astar: false
+      use_astar: true
       allow_unknown: true
 
 local_costmap:
@@ -189,6 +189,9 @@ behavior_server:
       plugin: "nav2_behaviors::Spin"
     backup:
       plugin: "nav2_behaviors::BackUp"
+      speed: -0.5
+      target_distance: 0.2
+      time_allowance: 10.0
     drive_on_heading:
       plugin: "nav2_behaviors::DriveOnHeading"
     wait:
