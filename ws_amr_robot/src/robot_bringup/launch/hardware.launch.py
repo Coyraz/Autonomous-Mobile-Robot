@@ -6,7 +6,7 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
-    # File ini DEDIKATIF hanya untuk menyalakan perangkat keras dan fusi sensor (EKF).
+    # File ini DEDIKATIF untuk perangkat keras, fusi sensor (EKF), dan Laser Odometry (RF2O).
     # TIDAK ADA algoritma pemetaan (SLAM) atau navigasi di sini.
     
     lidar_port = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
@@ -14,10 +14,14 @@ def generate_launch_description():
     bridge_node = Node(package='robot_bringup', executable='stm32_bridge', name='stm32_bridge', output='screen')
     odom_node = Node(package='robot_bringup', executable='odometry_node', name='odometry_node', output='screen')
     
+    # REVISI MUTLAK: Transformasi Fisik LiDAR
+    # Urutan argumen: [X, Y, Z, Yaw, Pitch, Roll, Parent_Frame, Child_Frame]
+    # X = 0.08 meter (8cm ke depan)
+    # Z = 0.17 meter (17cm ke atas dari lantai)
     tf_node = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0', '0', '0', '0', '0', '0', 'base_link', 'laser_frame'],
+        arguments=['0.08', '0.0', '0.17', '3.14159', '0.0', '0.0', 'base_link', 'laser_frame'],
         output='screen'
     )
 
@@ -29,25 +33,36 @@ def generate_launch_description():
 
     restamper_node = Node(package='robot_bringup', executable='laser_restamper', name='laser_restamper', output='screen')
 
+    # NODE BARU: RF2O Laser Odometry
+    rf2o_node = Node(
+        package='rf2o_laser_odometry',
+        executable='rf2o_laser_odometry_node',
+        name='rf2o_laser_odometry',
+        output='screen',
+        parameters=[{
+            'laser_scan_topic' : '/scan',
+            'odom_topic' : '/odom_rf2o',
+            'publish_tf' : False,               # KRUSIAL: Mencegah tabrakan transformasi dengan EKF
+            'base_frame_id' : 'base_link',
+            'odom_frame_id' : 'odom',
+            'init_pose_from_topic' : '',
+            'freq' : 20.0
+        }]
+    )
+
+    # REKONFIGURASI: Memanggil file ekf.yaml eksternal
+    ekf_config_path = os.path.join(
+        get_package_share_directory('robot_bringup'),
+        'config',
+        'ekf.yaml'
+    )
+
     ekf_node = Node(
         package='robot_localization',
         executable='ekf_node',
         name='ekf_filter_node',
         output='screen',
-        parameters=[{
-            'frequency': 20.0,
-            'two_d_mode': True,
-            'publish_tf': True,
-            'map_frame': 'map',
-            'odom_frame': 'odom',
-            'base_link_frame': 'base_link',
-            'world_frame': 'odom',
-            'odom0': '/odom_raw',
-            'odom0_config': [True,  True,  False, False, False, True, False, False, False, False, False, False, False, False, False],
-            'imu0': '/imu/data_raw',
-            'imu0_config': [False, False, False, False, False, False, False, False, False, False, False, True, False, False, False],
-            'imu0_remove_gravitational_acceleration': True
-        }]
+        parameters=[ekf_config_path]
     )
 
     return LaunchDescription([
@@ -56,5 +71,6 @@ def generate_launch_description():
         tf_node,
         lidar_launch,
         restamper_node,
+        rf2o_node,
         ekf_node
     ])
