@@ -8,8 +8,8 @@ def generate_launch_description():
     pkg_bringup = get_package_share_directory('robot_bringup')
     bt_navigator_dir = get_package_share_directory('nav2_bt_navigator')
     
-    # 2. Mendefinisikan lokasi file konfigurasi mutlak
-    map_file = os.path.join(pkg_bringup, 'maps', 'mapping_lab_with_ekf_attempt_2.yaml')
+    # 2. Map File Location
+    map_file = os.path.join(pkg_bringup, 'maps', 'Map_Odom_wo_Enc_Lab_INACOS_v1.yaml')
     nav2_params_file = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     default_bt_xml = os.path.join(bt_navigator_dir, 'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery.xml')
 
@@ -49,7 +49,8 @@ def generate_launch_description():
         executable='controller_server',
         name='controller_server',
         output='screen',
-        parameters=[nav2_params_file]
+        parameters=[nav2_params_file],
+        remappings=[('cmd_vel', 'cmd_vel_nav')]
     )
 
     planner_server = Node(
@@ -65,7 +66,8 @@ def generate_launch_description():
         executable='behavior_server',
         name='behavior_server',
         output='screen',
-        parameters=[nav2_params_file]
+        parameters=[nav2_params_file],
+        remappings=[('cmd_vel', 'cmd_vel_nav')]
     )
 
     bt_navigator = Node(

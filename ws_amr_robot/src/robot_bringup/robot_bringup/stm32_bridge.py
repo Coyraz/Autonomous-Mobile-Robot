@@ -5,7 +5,7 @@ import serial
 import json
 from std_msgs.msg import Int32MultiArray
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import Imu  # [TAMBAHAN MUTLAK] Import standar pesan inersia ROS 2
+from sensor_msgs.msg import Imu  
 
 class STM32Bridge(Node):
     def __init__(self):
@@ -62,7 +62,7 @@ class STM32Bridge(Node):
         return delta
     
     def cmd_vel_callback(self, msg):
-        """Convert Twist message to STM32 format"""
+        """Convert TwistStamped message to STM32 format"""
         self.current_v = int(msg.linear.x * 1000)   # m/s to mm/s
         self.current_w = int(msg.angular.z * 1000)  # rad/s to mrad/s
         

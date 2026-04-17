@@ -34,6 +34,7 @@ setup(
             'odometry_node = robot_bringup.odometry_node:main',
             'laser_restamper = robot_bringup.laser_restamper:main',
             'teleop_keyboard = robot_bringup.teleop_keyboard:main',
+            'teleop_translator = robot_bringup.teleop_translator:main',
         ],
     },
 )

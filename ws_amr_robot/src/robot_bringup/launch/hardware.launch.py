@@ -64,6 +64,21 @@ def generate_launch_description():
         output='screen',
         parameters=[ekf_config_path]
     )
+    
+    twist_mux_config_path = os.path.join(
+        get_package_share_directory('robot_bringup'),
+        'config',
+        'twist_mux.yaml'
+    )
+    
+    twist_mux_node = Node(
+        package='twist_mux',
+        executable='twist_mux',
+        name='twist_mux',
+        output='screen',
+        parameters=[twist_mux_config_path, {'use_stamped': False}],
+        remappings=[('cmd_vel_out', 'cmd_vel')]
+    )
 
     return LaunchDescription([
         bridge_node,
@@ -72,5 +87,6 @@ def generate_launch_description():
         lidar_launch,
         restamper_node,
         rf2o_node,
-        ekf_node
+        ekf_node,
+        twist_mux_node
     ])

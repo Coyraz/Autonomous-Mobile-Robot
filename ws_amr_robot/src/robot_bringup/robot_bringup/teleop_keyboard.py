@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TwistStamped
 import sys
 import termios
 import tty
@@ -12,7 +12,7 @@ class TeleopKeyboard(Node):
         super().__init__('teleop_keyboard')
         
         # Publisher for velocity commands (ROS standard topic)
-        self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.cmd_vel_pub = self.create_publisher(TwistStamped, '/cmd_vel_teleop', 10)
         
         # Velocity settings (m/s and rad/s)
         self.linear_speed = 0.6    # m/s 
@@ -47,13 +47,16 @@ class TeleopKeyboard(Node):
         if not self.running:
             return
         
-        msg = Twist()
-        msg.linear.x = self.current_v
-        msg.linear.y = 0.0
-        msg.linear.z = 0.0
-        msg.angular.x = 0.0
-        msg.angular.y = 0.0
-        msg.angular.z = self.current_w
+        msg = TwistStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'base_link'
+        
+        msg.twist.linear.x = float(self.current_v)
+        msg.twist.linear.y = 0.0
+        msg.twist.linear.z = 0.0
+        msg.twist.angular.x = 0.0
+        msg.twist.angular.y = 0.0
+        msg.twist.angular.z = float(self.current_w)
         
         self.cmd_vel_pub.publish(msg)
     
