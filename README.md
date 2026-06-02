@@ -33,3 +33,6 @@ for outputing the map after visualization:
     cd src/robot_bringup/maps
     ros2 run nav2_map_server map_saver_cli -t /map -f nama_peta_anda
     
+for terminate all the system, run on terminal:
+
+    ~/kill_robot.sh
