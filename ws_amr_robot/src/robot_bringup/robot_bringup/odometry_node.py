@@ -12,13 +12,13 @@ class OdometryNode(Node):
 
         # --- KONFIGURASI FISIK ---
         self.wheel_diameter = 0.068
-        self.wheel_base = 0.292 
+        self.wheel_base = 0.292
         self.ticks_per_rev = 4600.0
-        
+
         # --- POLARITAS (Sesuai data empiris terakhir) ---
-        self.polarity_left = 1.0  
-        self.polarity_right = -1.0 
-        
+        self.polarity_left = 1.0
+        self.polarity_right = -1.0
+
         # --- KONSTANTA ---
         self.m_per_tick = (math.pi * self.wheel_diameter) / self.ticks_per_rev
 
@@ -26,7 +26,13 @@ class OdometryNode(Node):
         self.x = 0.0
         self.y = 0.0
         self.theta = 0.0
-        
+
+        # --- VELOCITY STATE (NEW) ---
+        # These were missing before. Without these, EKF gets zero velocity always.
+        self.vx = 0.0
+        self.vyaw = 0.0
+        self.last_encoder_time = None  # Will be set on first encoder message
+
         self.prev_left_ticks = 0
         self.prev_right_ticks = 0
         self.initialized = False
@@ -37,79 +43,110 @@ class OdometryNode(Node):
             self.encoder_callback,
             10
         )
-        
-        # [KUNCI ABSOLUT 1] Mengirim ke 'odom_raw' agar disedot oleh ekf_node
+
         self.pub_odom = self.create_publisher(Odometry, 'odom_raw', 10)
-        
-        # [KUNCI ABSOLUT 2] tf_broadcaster DIHAPUS TOTAL.
-        # Odometry tidak lagi berhak membuat TF. Hak itu kini milik EKF.
-        
+
         self.create_timer(0.05, self.publish_odometry)
-        
-        self.get_logger().info('Odometry Node Started. Mode RAW untuk diumpankan ke EKF.')
+
+        self.get_logger().info('Odometry Node Started. Mode RAW with real velocity calculation.')
 
     def encoder_callback(self, msg):
-        current_left = msg.data[0] * self.polarity_left
+        now = self.get_clock().now()
+
+        current_left  = msg.data[0] * self.polarity_left
         current_right = msg.data[1] * self.polarity_right
 
         if not self.initialized:
-            self.prev_left_ticks = current_left
+            self.prev_left_ticks  = current_left
             self.prev_right_ticks = current_right
+            self.last_encoder_time = now
             self.initialized = True
             return
 
-        d_left_ticks = current_left - self.prev_left_ticks
+        # --- CALCULATE TIME DELTA ---
+        # This is the key addition. We need real time between callbacks
+        # to calculate real velocity, not just assume a fixed interval.
+        dt = (now - self.last_encoder_time).nanoseconds / 1e9
+        self.last_encoder_time = now
+
+        # Guard against zero or near-zero dt to avoid division by zero.
+        # This can happen if two messages arrive almost simultaneously.
+        if dt < 0.001:
+            return
+
+        # --- CALCULATE TICK DELTAS ---
+        d_left_ticks  = current_left  - self.prev_left_ticks
         d_right_ticks = current_right - self.prev_right_ticks
 
-        self.prev_left_ticks = current_left
+        self.prev_left_ticks  = current_left
         self.prev_right_ticks = current_right
 
-        d_left_meters = d_left_ticks * self.m_per_tick
-        d_right_meters = d_right_ticks * self.m_per_tick
+        # --- CONVERT TO METERS ---
+        d_left  = d_left_ticks  * self.m_per_tick
+        d_right = d_right_ticks * self.m_per_tick
 
-        d_center = (d_left_meters + d_right_meters) / 2.0
-        d_theta = (d_right_meters - d_left_meters) / self.wheel_base
+        # --- UPDATE POSITION ---
+        d_center = (d_left + d_right) / 2.0
+        d_theta  = (d_right - d_left) / self.wheel_base
 
-        self.x += d_center * math.cos(self.theta)
-        self.y += d_center * math.sin(self.theta)
+        self.x     += d_center * math.cos(self.theta)
+        self.y     += d_center * math.sin(self.theta)
         self.theta += d_theta
-        
-        self.theta = math.atan2(math.sin(self.theta), math.cos(self.theta))
+        self.theta  = math.atan2(math.sin(self.theta), math.cos(self.theta))
+
+        # --- CALCULATE REAL VELOCITY (NEW) ---
+        # Divide distance traveled by time elapsed.
+        # This gives actual speed in m/s and rad/s.
+        # Before this fix, vx and vyaw were always 0.0 which confused the EKF.
+        self.vx   = d_center / dt
+        self.vyaw = d_theta  / dt
 
     def publish_odometry(self):
         now = self.get_clock().now()
-        current_time_msg = now.to_msg()
-        
         q = self.euler_to_quaternion(0, 0, self.theta)
 
         odom = Odometry()
-        odom.header.stamp = current_time_msg 
+        odom.header.stamp = now.to_msg()
         odom.header.frame_id = 'odom'
         odom.child_frame_id = 'base_link'
-        
+
+        # --- POSE ---
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         odom.pose.pose.orientation = q
-        
-        # [KUNCI ABSOLUT 3] Matriks Kovariansi Wajib. EKF menolak data kosong.
-        # Kita set X rendah (dipercaya), dan Yaw tinggi (tidak dipercaya karena selip)
-        odom.pose.covariance[0] = 0.05   # Kepastian X
-        odom.pose.covariance[7] = 0.05   # Kepastian Y
-        odom.pose.covariance[35] = 10.0  # Ketidakpastian Yaw (Rotasi roda diabaikan)
-        
-        odom.twist.twist.linear.x = 0.0
-        odom.twist.twist.angular.z = 0.0
-        odom.twist.covariance[0] = 0.05
-        odom.twist.covariance[35] = 10.0
+
+        # Pose covariance.
+        # X and Y are trusted (encoder is accurate over short distances).
+        # Yaw reduced from 10.0 to 0.1 because PID now gives consistent motion.
+        # We still do not fully trust encoder yaw because slip can happen.
+        odom.pose.covariance[0]  = 0.05   # X uncertainty
+        odom.pose.covariance[7]  = 0.05   # Y uncertainty
+        odom.pose.covariance[35] = 0.1    # Yaw uncertainty (was 10.0, now reduced)
+
+        # --- TWIST (VELOCITY) ---
+        # These are now REAL values calculated from encoder deltas and time.
+        # Before this fix these were hardcoded to 0.0 which broke the EKF.
+        odom.twist.twist.linear.x  = self.vx
+        odom.twist.twist.angular.z = self.vyaw
+
+        # Twist covariance.
+        # Velocity from encoder is fairly trustworthy on short timescales.
+        odom.twist.covariance[0]  = 0.05   # Vx uncertainty
+        odom.twist.covariance[35] = 0.05   # Vyaw uncertainty (was 10.0)
 
         self.pub_odom.publish(odom)
 
     def euler_to_quaternion(self, roll, pitch, yaw):
-        qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
-        qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
-        qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
-        qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+        qx = math.sin(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) \
+           - math.cos(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
+        qy = math.cos(roll/2) * math.sin(pitch/2) * math.cos(yaw/2) \
+           + math.sin(roll/2) * math.cos(pitch/2) * math.sin(yaw/2)
+        qz = math.cos(roll/2) * math.cos(pitch/2) * math.sin(yaw/2) \
+           - math.sin(roll/2) * math.sin(pitch/2) * math.cos(yaw/2)
+        qw = math.cos(roll/2) * math.cos(pitch/2) * math.cos(yaw/2) \
+           + math.sin(roll/2) * math.sin(pitch/2) * math.sin(yaw/2)
         return Quaternion(x=qx, y=qy, z=qz, w=qw)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -121,6 +158,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

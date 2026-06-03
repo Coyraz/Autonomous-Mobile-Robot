@@ -39,10 +39,11 @@ def generate_launch_description():
         executable='rf2o_laser_odometry_node',
         name='rf2o_laser_odometry',
         output='screen',
+        respawn=False,
         parameters=[{
             'laser_scan_topic' : '/scan',
             'odom_topic' : '/odom_rf2o',
-            'publish_tf' : False,               # KRUSIAL: Mencegah tabrakan transformasi dengan EKF
+            'publish_tf' : False,
             'base_frame_id' : 'base_link',
             'odom_frame_id' : 'odom',
             'init_pose_from_topic' : '',
@@ -62,7 +63,10 @@ def generate_launch_description():
         executable='ekf_node',
         name='ekf_filter_node',
         output='screen',
-        parameters=[ekf_config_path]
+        parameters=[ekf_config_path],
+        remappings=[
+            ('odometry/filtered', 'odom')
+        ]
     )
     
     twist_mux_config_path = os.path.join(

@@ -13,3 +13,9 @@ ws_amr_robot_KARANTINA/
 __pycache__/
 *.pyc
 *.pyo
+__pycache__/
+*.pyc
+*.pyo
+*.gv
+*.pdf
+rosgraph*.png

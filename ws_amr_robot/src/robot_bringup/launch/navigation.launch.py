@@ -9,7 +9,7 @@ def generate_launch_description():
     bt_navigator_dir = get_package_share_directory('nav2_bt_navigator')
     
     # 2. Map File Location
-    map_file = os.path.join(pkg_bringup, 'maps', 'Map_Odom_wo_Enc_Lab_INACOS_v1.yaml')
+    map_file = os.path.join(pkg_bringup, 'maps', 'mapping_lab_with_ekf_attempt_2.yaml')
     nav2_params_file = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     default_bt_xml = os.path.join(bt_navigator_dir, 'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery.xml')
 
@@ -23,7 +23,8 @@ def generate_launch_description():
         'planner_server',
         'behavior_server',
         'bt_navigator',
-        'waypoint_follower'
+        'waypoint_follower',
+        'velocity_smoother'
     ]
 
     # --- DEKLARASI SIMPUL INDIVIDUAL ---
@@ -99,6 +100,18 @@ def generate_launch_description():
             {'node_names': lifecycle_nodes}
         ]
     )
+    
+    velocity_smoother = Node(
+        package='nav2_velocity_smoother',
+        executable='velocity_smoother',
+        name='velocity_smoother',
+        output='screen',
+        parameters=[nav2_params_file],
+        remappings=[
+            ('cmd_vel', 'cmd_vel_nav'),
+            ('cmd_vel_smoothed', 'cmd_vel')
+        ]
+    )
 
     return LaunchDescription([
         map_server,
@@ -108,5 +121,6 @@ def generate_launch_description():
         behavior_server,
         bt_navigator,
         waypoint_follower,
-        lifecycle_manager
+        lifecycle_manager,
+        velocity_smoother
     ])

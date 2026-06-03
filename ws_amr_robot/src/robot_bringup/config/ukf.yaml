@@ -1,0 +1,62 @@
+ukf_filter_node:
+  ros__parameters:
+    frequency: 20.0
+    two_d_mode: true
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # ========================================================================
+    # PARAMETER SPESIFIK UNSCENTED KALMAN FILTER (UKF)
+    # Sumber Referensi: Dokumentasi Resmi robot_localization ROS 2
+    # ========================================================================
+    # alpha: Menentukan seberapa jauh Titik Sigma (Sigma Points) menyebar 
+    # dari nilai rata-rata. Angka 0.001 adalah standar untuk menjaga titik
+    # tetap dekat dan menghindari efek non-lokal.
+    alpha: 0.001
+    
+    # kappa: Parameter skala sekunder. Standar industri disetel pada 0.0.
+    kappa: 0.0
+    
+    # beta: Memasukkan pengetahuan awal tentang distribusi data. Untuk 
+    # distribusi Gaussian (distribusi normal sensor), nilai 2.0 adalah optimal.
+    beta: 2.0
+
+    # ========================================================================
+    # SAKSI UTAMA: ODOMETRI LASER (RF2O)
+    # ========================================================================
+    odom0: /odom_rf2o
+    # REVISI MUTLAK: Hanya menerima Vx, Vy, VYaw. 
+    # Menerima Posisi (X,Y) dari RF2O akan menyebabkan drift kumulatif.
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, false,
+                   false, false, false]
+    odom0_differential: false
+
+    # ========================================================================
+    # SAKSI CADANGAN (REDUNDANSI): ODOMETRI RODA (ENCODER)
+    # Status saat ini: DINONAKTIFKAN SESUAI PERMINTAAN
+    # ========================================================================
+    # odom1: /odom_raw
+    # odom1_config: [false, false, false,
+    #                false, false, false,
+    #                true,  false, false,
+    #                false, false, true,
+    #                false, false, false]
+    # odom1_differential: false
+
+    # ========================================================================
+    # SAKSI INERSIA: IMU
+    # ========================================================================
+    imu0: /imu/data_raw
+    # IMU adalah hakim absolut untuk kecepatan rotasi aktual (VYaw).
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,
+                  false, false, false]
+    imu0_remove_gravitational_acceleration: false
