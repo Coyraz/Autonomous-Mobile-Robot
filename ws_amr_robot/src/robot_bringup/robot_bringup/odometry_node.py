@@ -64,13 +64,19 @@ class OdometryNode(Node):
             return
 
         # --- CALCULATE TIME DELTA ---
-        # This is the key addition. We need real time between callbacks
-        # to calculate real velocity, not just assume a fixed interval.
-        dt = (now - self.last_encoder_time).nanoseconds / 1e9
+        # Prefer the STM32-reported elapsed time (wheel_encoders[2], in ms)
+        # over Pi wall clock. The STM32 dt is the exact window during which
+        # those ticks were counted, so velocity = ticks / dt_stm32 is more
+        # accurate than dividing by Pi scheduling time.
+        # Fall back to Pi wall clock if old firmware (no index 2) or zero.
+        dt_pi = (now - self.last_encoder_time).nanoseconds / 1e9
         self.last_encoder_time = now
 
-        # Guard against zero or near-zero dt to avoid division by zero.
-        # This can happen if two messages arrive almost simultaneously.
+        if len(msg.data) >= 3 and msg.data[2] > 0:
+            dt = msg.data[2] / 1000.0
+        else:
+            dt = dt_pi
+
         if dt < 0.001:
             return
 

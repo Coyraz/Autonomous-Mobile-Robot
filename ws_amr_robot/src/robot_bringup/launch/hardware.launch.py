@@ -11,7 +11,14 @@ def generate_launch_description():
     
     lidar_port = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
     
-    bridge_node = Node(package='robot_bringup', executable='stm32_bridge', name='stm32_bridge', output='screen')
+    bridge_node = Node(
+        package='robot_bringup',
+        executable='stm32_bridge',
+        name='stm32_bridge',
+        output='screen',
+        respawn=True,
+        respawn_delay=3.0
+    )
     odom_node = Node(package='robot_bringup', executable='odometry_node', name='odometry_node', output='screen')
     
     # REVISI MUTLAK: Transformasi Fisik LiDAR

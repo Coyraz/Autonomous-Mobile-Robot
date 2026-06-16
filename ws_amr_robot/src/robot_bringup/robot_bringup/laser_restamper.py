@@ -24,7 +24,7 @@ class LaserRestamper(Node):
             10 
         )
         
-        self.get_logger().info('Laser Restamper Active: BACKDATING time by 500ms for Slow EKF Sync...')
+        self.get_logger().info('Laser Restamper Active: BACKDATING time by 200ms for Slow EKF Sync...')
     
     def scan_callback(self, msg):
         restamped_msg = LaserScan()
@@ -44,10 +44,9 @@ class LaserRestamper(Node):
         restamped_msg.header.frame_id = 'laser_frame' 
         
         # --- [OPERASI BEDAH MUTLAK: EKSTREMASI TIME BACKDATING] ---
-        # Mengompensasi CPU Raspberry Pi yang tersedak. EKF butuh >300ms untuk berpikir.
-        # Kita memundurkan waktu Lidar sebanyak 500 milidetik (0.5 detik) ke masa lalu.
+        #EKF needs approximately 200ms sync time, testing reduced from 500ms.
         now = self.get_clock().now()
-        offset = Duration(seconds=0, nanoseconds=500000000) # 500 ms
+        offset = Duration(seconds=0, nanoseconds=200000000)
         past_time = now - offset
         
         restamped_msg.header.stamp = past_time.to_msg()
