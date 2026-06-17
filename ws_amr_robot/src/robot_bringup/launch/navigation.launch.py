@@ -3,9 +3,11 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
-# Switch between the stock Nav2 DWB controller and our custom Pure Pursuit
-# controller. Set to True to run the custom controller, False to run DWB.
-USE_CUSTOM_CONTROLLER = True
+# Which local controller to run. One of:
+#   "custom" -> our own Pure Pursuit node (custom_path_controller)
+#   "dwb"    -> stock Nav2 DWB
+#   "rpp"    -> stock Nav2 Regulated Pure Pursuit (controller_rpp.yaml)
+CONTROLLER = "rpp"
 
 
 def generate_launch_description():
@@ -18,6 +20,7 @@ def generate_launch_description():
     keepout_file    = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_keepout.yaml')
     nav2_params_file = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     custom_ctrl_file = os.path.join(pkg_bringup, 'config', 'custom_controller.yaml')
+    rpp_ctrl_file   = os.path.join(pkg_bringup, 'config', 'controller_rpp.yaml')
     default_bt_xml  = os.path.join(bt_navigator_dir, 'behavior_trees',
                                    'navigate_to_pose_w_replanning_and_recovery.xml')
 
@@ -108,7 +111,7 @@ def generate_launch_description():
 
     # --- CONTROLLER-SPECIFIC NODES ---
 
-    if USE_CUSTOM_CONTROLLER:
+    if CONTROLLER == "custom":
         # Our custom Pure Pursuit controller. Serves navigate_to_pose, asks
         # planner_server for a global path, tracks it, publishes cmd_vel_nav.
         custom_path_controller = Node(
@@ -121,8 +124,10 @@ def generate_launch_description():
         nodes.append(custom_path_controller)
 
     else:
-        # Stock Nav2 DWB stack: controller_server + behavior_server +
-        # bt_navigator + waypoint_follower. These are lifecycle-managed.
+        # Stock Nav2 controller_server stack (DWB or RPP). Both use the same
+        # bt_navigator + behavior_server + waypoint_follower and the local
+        # costmap from nav2_params.yaml. For RPP we append controller_rpp.yaml,
+        # which overrides only the FollowPath plugin to Regulated Pure Pursuit.
         lifecycle_nodes += [
             'controller_server',
             'behavior_server',
@@ -130,12 +135,17 @@ def generate_launch_description():
             'waypoint_follower',
         ]
 
+        if CONTROLLER == "rpp":
+            controller_params = [nav2_params_file, rpp_ctrl_file]
+        else:  # "dwb"
+            controller_params = [nav2_params_file]
+
         controller_server = Node(
             package='nav2_controller',
             executable='controller_server',
             name='controller_server',
             output='screen',
-            parameters=[nav2_params_file],
+            parameters=controller_params,
             remappings=[('cmd_vel', 'cmd_vel_nav')]
         )
 
