@@ -21,6 +21,7 @@ from pathlib import Path
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
 from nav_msgs.msg import OccupancyGrid, Odometry
@@ -90,11 +91,20 @@ class NavBridgeNode(Node):
         self._path_xs = []
         self._path_ys = []
 
+        # /map is published LATCHED (transient_local) by map_server: it is sent
+        # once and held for late subscribers. We must match that durability or
+        # we miss it whenever ils_gui starts after map_server (the usual case).
+        map_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+
         # Subscriptions
         self.create_subscription(
             PoseWithCovarianceStamped, '/amcl_pose', self._cb_pose, 10)
         self.create_subscription(
-            OccupancyGrid, '/map', self._cb_map, 1)
+            OccupancyGrid, '/map', self._cb_map, map_qos)
         self.create_subscription(
             Odometry, '/odom_raw', self._cb_odom, 10)
         self.create_subscription(
@@ -407,7 +417,7 @@ header img   { height: 36px; width: auto; object-fit: contain; }
 /* ---- Map ---- */
 .map-card { overflow-y: auto; max-height: calc(100vh - 90px); }
 .map-card img {
-  width: 100%; height: auto; display: block;
+  width: 75%; height: auto; display: block; margin: 0 auto;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
 }
@@ -443,47 +453,48 @@ header img   { height: 36px; width: auto; object-fit: contain; }
 }
 .btn-danger:hover { background: #b71c1c; }
 
-/* ---- Joystick ---- */
+/* ---- D-pad teleop ---- */
 .teleop-inner {
   display: flex;
   gap: 16px;
   align-items: center;
 }
-.joy-wrap { text-align: center; flex-shrink: 0; }
-.joy-label { font-size: 0.62rem; color: #aaa; margin-bottom: 5px; }
-.joy-hint  { font-size: 0.62rem; color: #ccc; margin-top: 5px; }
+.dpad-wrap { text-align: center; flex-shrink: 0; }
+.dpad-hint { font-size: 0.62rem; color: #aaa; margin-top: 7px; line-height: 1.4; }
 
-.joystick-area {
-  width: 128px; height: 128px;
-  border-radius: 50%;
-  background: #f0f2f5;
-  border: 2px solid #cfd8dc;
-  position: relative;
-  cursor: grab;
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 5px;
   touch-action: none;
   user-select: none;
 }
-.joystick-area:active { cursor: grabbing; }
-.joystick-area::before,
-.joystick-area::after {
-  content: ''; position: absolute;
-  background: #cfd8dc; pointer-events: none;
-}
-.joystick-area::before { width: 1px; height: 100%; left: 50%; top: 0; }
-.joystick-area::after  { width: 100%; height: 1px; top: 50%; left: 0; }
-
-.joystick-handle {
-  width: 42px; height: 42px;
-  border-radius: 50%;
+.dpad-btn {
+  border: none;
+  border-radius: 8px;
   background: #1565c0;
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  box-shadow: 0 2px 8px rgba(21,101,192,0.4);
-  z-index: 1;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.joy-active .joystick-handle { background: #0d47a1; }
+.dpad-btn:active, .dpad-btn.pressed { background: #0d47a1; transform: scale(0.95); }
+.dpad-up    { grid-column: 2; grid-row: 1; }
+.dpad-left  { grid-column: 1; grid-row: 2; }
+.dpad-stop  { grid-column: 2; grid-row: 2; background: #c62828; font-size: 0.6rem; }
+.dpad-stop:active, .dpad-stop.pressed { background: #8e0000; }
+.dpad-right { grid-column: 3; grid-row: 2; }
+.dpad-down  { grid-column: 2; grid-row: 3; }
+.dpad-up::after    { content: '\\2191'; }
+.dpad-down::after  { content: '\\2193'; }
+.dpad-left::after  { content: '\\2190'; }
+.dpad-right::after { content: '\\2192'; }
 
 .teleop-stats {
   flex: 1;
@@ -603,12 +614,15 @@ header img   { height: 36px; width: auto; object-fit: contain; }
     <div class="card">
       <div class="section-label">Manual Teleop</div>
       <div class="teleop-inner">
-        <div class="joy-wrap">
-          <div class="joy-label">Drag to drive</div>
-          <div id="joy-area" class="joystick-area">
-            <div id="joy-handle" class="joystick-handle"></div>
+        <div class="dpad-wrap">
+          <div class="dpad">
+            <button class="dpad-btn dpad-up"    data-dir="fwd"></button>
+            <button class="dpad-btn dpad-left"  data-dir="left"></button>
+            <button class="dpad-btn dpad-stop"  data-dir="stop">STOP</button>
+            <button class="dpad-btn dpad-right" data-dir="right"></button>
+            <button class="dpad-btn dpad-down"  data-dir="back"></button>
           </div>
-          <div class="joy-hint">Release = stop</div>
+          <div class="dpad-hint">Hold to move, release = stop<br>Keyboard: W A S D or arrows, Space = stop</div>
         </div>
         <div class="teleop-stats">
           <div>
@@ -619,8 +633,7 @@ header img   { height: 36px; width: auto; object-fit: contain; }
             <div class="stat-label">Angular</div>
             <div class="stat-value" id="joy-angular">0.00 rad/s</div>
           </div>
-          <button class="btn-danger" onclick="emergencyStop()">STOP</button>
-          <div class="teleop-note">Max 150 mm/s | 0.7 rad/s<br>Grab cancels active nav goal</div>
+          <div class="teleop-note">Max 150 mm/s | 0.7 rad/s<br>Any press cancels active nav goal</div>
         </div>
       </div>
     </div>
@@ -720,112 +733,113 @@ setInterval(updateMap,    2000);
 updateStatus();
 
 // ================================================================
-// Virtual joystick
+// D-pad teleop: hold a direction (button or key) to move, release = stop.
+// Multiple inputs combine (e.g. forward + left). WASD or arrows, Space = stop.
 // ================================================================
-const joyArea   = document.getElementById('joy-area');
-const joyHandle = document.getElementById('joy-handle');
-
 const MAX_LIN = 0.15;   // m/s  (150 mm/s)
 const MAX_ANG = 0.70;   // rad/s
 
-let joyActive  = false;
-let joyLinear  = 0.0;
-let joyAngular = 0.0;
-let joyTimer   = null;
+const active = new Set();   // directions currently held: fwd/back/left/right
+let cmdTimer = null;
 
-function joyClientXY(e) {
-  if (e.touches && e.touches.length > 0) {
-    return {cx: e.touches[0].clientX, cy: e.touches[0].clientY};
-  }
-  return {cx: e.clientX, cy: e.clientY};
+function computeCmd() {
+  let lin = 0.0, ang = 0.0;
+  if (active.has('fwd'))   lin += MAX_LIN;
+  if (active.has('back'))  lin -= MAX_LIN;
+  if (active.has('left'))  ang += MAX_ANG;
+  if (active.has('right')) ang -= MAX_ANG;
+  return {lin, ang};
 }
 
-function joyCalc(e) {
-  const rect = joyArea.getBoundingClientRect();
-  const ox = rect.left + rect.width  / 2;
-  const oy = rect.top  + rect.height / 2;
-  const {cx, cy} = joyClientXY(e);
-
-  let dx = cx - ox;
-  let dy = cy - oy;
-  const maxR = rect.width / 2 - 4;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-  if (dist > maxR) { dx = dx / dist * maxR; dy = dy / dist * maxR; }
-
-  const nx = dx / maxR;   // -1 (left) .. +1 (right)
-  const ny = dy / maxR;   // -1 (up)   .. +1 (down)
-
-  // Move handle
-  joyHandle.style.left = (50 + nx * 40) + '%';
-  joyHandle.style.top  = (50 + ny * 40) + '%';
-
-  // Map to ROS convention: forward = +x, left turn = +z
-  joyLinear  = -ny * MAX_LIN;   // up drag  -> forward
-  joyAngular = -nx * MAX_ANG;   // left drag -> turn left (positive)
-
-  document.getElementById('joy-linear').textContent  =
-    (joyLinear * 1000).toFixed(0) + ' mm/s';
-  document.getElementById('joy-angular').textContent =
-    joyAngular.toFixed(2) + ' rad/s';
+function updateStats() {
+  const {lin, ang} = computeCmd();
+  document.getElementById('joy-linear').textContent  = (lin * 1000).toFixed(0) + ' mm/s';
+  document.getElementById('joy-angular').textContent = ang.toFixed(2) + ' rad/s';
 }
 
-function joyReset() {
-  joyHandle.style.left = '50%';
-  joyHandle.style.top  = '50%';
-  joyLinear  = 0.0;
-  joyAngular = 0.0;
-  document.getElementById('joy-linear').textContent  = '0 mm/s';
-  document.getElementById('joy-angular').textContent = '0.00 rad/s';
-}
-
-function joySend() {
+function sendCmd() {
+  const {lin, ang} = computeCmd();
   fetch('/cmd_vel', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({linear: joyLinear, angular: joyAngular})
+    body: JSON.stringify({linear: lin, angular: ang})
   }).catch(() => {});
 }
 
-function joyStart(e) {
-  e.preventDefault();
-  // Cancel any active navigation goal when taking manual control
+function startSending() {
+  if (cmdTimer) return;
+  // cancel any active nav goal once, when manual control begins
   fetch('/cancel', {method: 'POST'}).catch(() => {});
-  joyActive = true;
-  joyArea.classList.add('joy-active');
-  joyCalc(e);
-  joyTimer = setInterval(joySend, 100);
+  cmdTimer = setInterval(sendCmd, 100);
 }
 
-function joyMove(e) {
-  if (!joyActive) return;
+function stopAll() {
+  active.clear();
+  if (cmdTimer) { clearInterval(cmdTimer); cmdTimer = null; }
+  updateStats();
+  sendCmd();   // explicit zero velocity
+  document.querySelectorAll('.dpad-btn').forEach(b => b.classList.remove('pressed'));
+}
+
+function press(dir) {
+  if (dir === 'stop') { stopAll(); return; }
+  if (active.has(dir)) return;
+  active.add(dir);
+  startSending();
+  updateStats();
+}
+
+function release(dir) {
+  if (dir === 'stop' || !active.has(dir)) return;
+  active.delete(dir);
+  updateStats();
+  if (active.size === 0) stopAll();
+  else sendCmd();
+}
+
+function dirBtn(dir) { return document.querySelector('.dpad-btn[data-dir="' + dir + '"]'); }
+
+// --- buttons (mouse + touch unified via pointer events) ---
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+  const dir = btn.dataset.dir;
+  const down = e => { e.preventDefault(); btn.classList.add('pressed'); press(dir); };
+  const up   = e => { e.preventDefault(); btn.classList.remove('pressed'); release(dir); };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointerleave', up);
+  btn.addEventListener('pointercancel', up);
+});
+
+// --- keyboard (WASD + arrow keys, Space = stop) ---
+const keyMap = {
+  'w': 'fwd',  'arrowup': 'fwd',
+  's': 'back', 'arrowdown': 'back',
+  'a': 'left', 'arrowleft': 'left',
+  'd': 'right','arrowright': 'right',
+};
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const k = e.key.toLowerCase();
+  if (k === ' ' || k === 'spacebar') { e.preventDefault(); stopAll(); return; }
+  const dir = keyMap[k];
+  if (!dir) return;
   e.preventDefault();
-  joyCalc(e);
-}
+  if (e.repeat) return;
+  const b = dirBtn(dir); if (b) b.classList.add('pressed');
+  press(dir);
+});
+window.addEventListener('keyup', e => {
+  const dir = keyMap[e.key.toLowerCase()];
+  if (!dir) return;
+  e.preventDefault();
+  const b = dirBtn(dir); if (b) b.classList.remove('pressed');
+  release(dir);
+});
 
-function joyStop() {
-  if (!joyActive) return;
-  joyActive = false;
-  clearInterval(joyTimer);
-  joyArea.classList.remove('joy-active');
-  joyReset();
-  joySend();   // send zero velocity immediately
-}
+// safety: stop if the window loses focus mid-press
+window.addEventListener('blur', stopAll);
 
-function emergencyStop() {
-  joyStop();
-  cancelNav();
-}
-
-// Mouse events (use window for move/up so drag works outside the circle)
-joyArea.addEventListener('mousedown', joyStart);
-window.addEventListener('mousemove',  joyMove);
-window.addEventListener('mouseup',    joyStop);
-
-// Touch events
-joyArea.addEventListener('touchstart', joyStart, {passive: false});
-joyArea.addEventListener('touchmove',  joyMove,  {passive: false});
-joyArea.addEventListener('touchend',   joyStop);
-joyArea.addEventListener('touchcancel',joyStop);
+function emergencyStop() { stopAll(); cancelNav(); }
 </script>
 </body>
 </html>"""
