@@ -3,6 +3,11 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
+# Switch between the stock Nav2 DWB controller and our custom Pure Pursuit
+# controller. Set to True to run the custom controller, False to run DWB.
+USE_CUSTOM_CONTROLLER = True
+
+
 def generate_launch_description():
     # 1. Get package locations
     pkg_bringup = get_package_share_directory('robot_bringup')
@@ -12,24 +17,21 @@ def generate_launch_description():
     map_file        = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_edited.yaml')
     keepout_file    = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_keepout.yaml')
     nav2_params_file = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
+    custom_ctrl_file = os.path.join(pkg_bringup, 'config', 'custom_controller.yaml')
     default_bt_xml  = os.path.join(bt_navigator_dir, 'behavior_trees',
                                    'navigate_to_pose_w_replanning_and_recovery.xml')
 
-    # 3. Lifecycle nodes list
+    # 3. Lifecycle nodes list (shared base + controller-specific additions below)
     lifecycle_nodes = [
         'map_server',
         'filter_mask_server',
         'costmap_filter_info_server',
         'amcl',
-        'controller_server',
         'planner_server',
-        'behavior_server',
-        'bt_navigator',
-        'waypoint_follower',
         'velocity_smoother'
     ]
 
-    # --- NAVIGATION NODES ---
+    # --- SHARED NAVIGATION NODES ---
 
     map_server = Node(
         package='nav2_map_server',
@@ -39,7 +41,6 @@ def generate_launch_description():
         parameters=[nav2_params_file, {'yaml_filename': map_file}]
     )
 
-    # NEW: Serves the keepout mask image as a map topic
     filter_mask_server = Node(
         package='nav2_map_server',
         executable='map_server',
@@ -76,58 +77,12 @@ def generate_launch_description():
         parameters=[nav2_params_file]
     )
 
-    controller_server = Node(
-        package='nav2_controller',
-        executable='controller_server',
-        name='controller_server',
-        output='screen',
-        parameters=[nav2_params_file],
-        remappings=[('cmd_vel', 'cmd_vel_nav')]
-    )
-
     planner_server = Node(
         package='nav2_planner',
         executable='planner_server',
         name='planner_server',
         output='screen',
         parameters=[nav2_params_file]
-    )
-
-    behavior_server = Node(
-        package='nav2_behaviors',
-        executable='behavior_server',
-        name='behavior_server',
-        output='screen',
-        parameters=[nav2_params_file],
-        remappings=[('cmd_vel', 'cmd_vel_nav')]
-    )
-
-    bt_navigator = Node(
-        package='nav2_bt_navigator',
-        executable='bt_navigator',
-        name='bt_navigator',
-        output='screen',
-        parameters=[nav2_params_file, {'default_bt_xml_filename': default_bt_xml}]
-    )
-
-    waypoint_follower = Node(
-        package='nav2_waypoint_follower',
-        executable='waypoint_follower',
-        name='waypoint_follower',
-        output='screen',
-        parameters=[nav2_params_file]
-    )
-
-    lifecycle_manager = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_navigation',
-        output='screen',
-        parameters=[
-            {'use_sim_time': False},
-            {'autostart': True},
-            {'node_names': lifecycle_nodes}
-        ]
     )
 
     velocity_smoother = Node(
@@ -142,16 +97,87 @@ def generate_launch_description():
         ]
     )
 
-    return LaunchDescription([
+    nodes = [
         map_server,
         filter_mask_server,
         costmap_filter_info_server,
         amcl,
-        controller_server,
         planner_server,
-        behavior_server,
-        bt_navigator,
-        waypoint_follower,
-        lifecycle_manager,
-        velocity_smoother
-    ])
+        velocity_smoother,
+    ]
+
+    # --- CONTROLLER-SPECIFIC NODES ---
+
+    if USE_CUSTOM_CONTROLLER:
+        # Our custom Pure Pursuit controller. Serves navigate_to_pose, asks
+        # planner_server for a global path, tracks it, publishes cmd_vel_nav.
+        custom_path_controller = Node(
+            package='robot_bringup',
+            executable='custom_path_controller',
+            name='custom_path_controller',
+            output='screen',
+            parameters=[custom_ctrl_file]
+        )
+        nodes.append(custom_path_controller)
+
+    else:
+        # Stock Nav2 DWB stack: controller_server + behavior_server +
+        # bt_navigator + waypoint_follower. These are lifecycle-managed.
+        lifecycle_nodes += [
+            'controller_server',
+            'behavior_server',
+            'bt_navigator',
+            'waypoint_follower',
+        ]
+
+        controller_server = Node(
+            package='nav2_controller',
+            executable='controller_server',
+            name='controller_server',
+            output='screen',
+            parameters=[nav2_params_file],
+            remappings=[('cmd_vel', 'cmd_vel_nav')]
+        )
+
+        behavior_server = Node(
+            package='nav2_behaviors',
+            executable='behavior_server',
+            name='behavior_server',
+            output='screen',
+            parameters=[nav2_params_file],
+            remappings=[('cmd_vel', 'cmd_vel_nav')]
+        )
+
+        bt_navigator = Node(
+            package='nav2_bt_navigator',
+            executable='bt_navigator',
+            name='bt_navigator',
+            output='screen',
+            parameters=[nav2_params_file, {'default_bt_xml_filename': default_bt_xml}]
+        )
+
+        waypoint_follower = Node(
+            package='nav2_waypoint_follower',
+            executable='waypoint_follower',
+            name='waypoint_follower',
+            output='screen',
+            parameters=[nav2_params_file]
+        )
+
+        nodes += [controller_server, behavior_server, bt_navigator, waypoint_follower]
+
+    # lifecycle manager must be created AFTER the node list is finalised
+    lifecycle_manager = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_navigation',
+        output='screen',
+        parameters=[
+            {'use_sim_time': False},
+            {'autostart': True},
+            {'node_names': lifecycle_nodes}
+        ]
+    )
+    nodes.append(lifecycle_manager)
+
+    return LaunchDescription(nodes)
