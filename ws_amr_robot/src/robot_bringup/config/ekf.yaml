@@ -1,0 +1,64 @@
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0          
+    two_d_mode: true          
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # ================================================================
+    # SENSOR 1: RF2O LASER ODOMETRY
+    # Role: Ground truth for POSITION (X, Y, Yaw)
+    # Does NOT provide velocity - that causes latency-induced oscillation
+    # ================================================================
+    odom0: /odom_rf2o
+    odom0_config: [true,  true,  false,     # X, Y position: YES
+                   false, false, true,      # Yaw orientation: YES
+                   false, false, false,     # Velocity Vx, Vy, Vz: NO
+                   false, false, false,     # Angular velocity: NO (IMU handles this)
+                   false, false, false]     # Acceleration: NO
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 5
+    odom0_nodelay: false
+    odom0_pose_rejection_threshold: 5.0
+    odom0_twist_rejection_threshold: 100.0
+
+    # ================================================================
+    # SENSOR 2: WHEEL ENCODER ODOMETRY
+    # Role: Real-time VELOCITY only (Vx and Vyaw)
+    # Encoders are fast and accurate for velocity on short timescales
+    # We do NOT use position from encoder because RF2O does it better
+    # ================================================================
+    odom1: /odom_raw
+    odom1_config: [false, false, false,     # Position: NO (RF2O is better)
+                   false, false, false,     # Orientation: NO
+                   true,  false, false,     # Vx: YES - encoder velocity is fresh
+                   false, false, false,     # Vyaw from encoder: NO (IMU handles this)
+                   false, false, false]     # Acceleration: NO
+    odom1_differential: false
+    odom1_relative: false
+    odom1_queue_size: 5
+    odom1_nodelay: true  
+    odom1_twist_rejection_threshold: 100.0
+
+    # ================================================================
+    # SENSOR 3: IMU (MPU6050)
+    # Role: ANGULAR VELOCITY only (gyro_z = Vyaw)
+    # IMU reacts fastest to rotation - lower latency than any other sensor
+    # We ignore acceleration because it is too noisy for a slow ground robot
+    # ================================================================
+    imu0: /imu/data_raw
+    imu0_config: [false, false, false,     # Position: NO
+                  false, false, false,     # Orientation: NO (no magnetometer)
+                  false, false, false,     # Linear velocity: NO
+                  false, false, true,      # Angular velocity Vyaw: YES - this is IMU's strength
+                  false, false, false]     # Linear acceleration: NO
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+    imu0_queue_size: 5
+    imu0_nodelay: true   
+    imu0_twist_rejection_threshold: 100.0

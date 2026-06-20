@@ -1,0 +1,1 @@
+/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/build/sllidar_ros2/ament_cmake_environment_hooks/local_setup.zsh

@@ -1,0 +1,21 @@
+# Mengabaikan folder kompilasi di direktori akar
+build/
+install/
+log/
+
+# Mengabaikan folder kompilasi di dalam ruang kerja ROS 2
+ws_amr_robot/build/
+ws_amr_robot/install/
+ws_amr_robot/log/
+ws_amr_robot_KARANTINA/
+
+# Mengabaikan file cache Python
+__pycache__/
+*.pyc
+*.pyo
+__pycache__/
+*.pyc
+*.pyo
+*.gv
+*.pdf
+rosgraph*.png

@@ -1,0 +1,35 @@
+custom_path_controller:
+  ros__parameters:
+    control_frequency: 25.0      # Hz control loop
+
+    # speed limits (match the hardware: L298N cap + motor rotation deadband)
+    max_linear_speed: 0.20       # m/s, L298N hardware cap
+    min_linear_speed: 0.05       # m/s
+    max_angular_speed: 0.60      # rad/s
+    min_angular_speed: 0.55      # rad/s, motor rotation deadband
+
+    # Pure Pursuit lookahead:  Ld = lookahead_gain * v + lookahead_min
+    lookahead_min: 0.25
+    lookahead_max: 0.40
+    lookahead_gain: 0.3
+
+    # cross-track (Stanley-style) correction. Raise to hug the path harder,
+    # lower if it oscillates.
+    crosstrack_gain: 1.0
+
+    # velocity profiling. Higher -> slows more on curves.
+    curve_slowdown: 1.5
+    approach_dist: 0.35
+
+    # goal acceptance
+    goal_xy_tolerance: 0.12
+    goal_yaw_tolerance: 0.15
+    capture_radius: 0.18
+
+    # if heading error to the path exceeds this, rotate in place first
+    heading_align_thresh: 0.7    # rad
+
+    # frames + output topic (cmd_vel_nav feeds velocity_smoother, like DWB did)
+    global_frame: "map"
+    robot_frame: "base_link"
+    cmd_vel_topic: "cmd_vel_nav"
