@@ -1,4 +1,0 @@
-../Core/Src/freertos.c:78:6:MX_FREERTOS_Init	1
-../Core/Src/freertos.c:120:6:StartDefaultTask	15
-../Core/Src/freertos.c:265:6:HAL_UART_RxCpltCallback	7
-../Core/Src/freertos.c:300:6:HAL_GPIO_EXTI_Callback	1

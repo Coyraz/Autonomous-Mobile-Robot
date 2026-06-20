@@ -1,4 +1,0 @@
-../Core/Src/mpu6050.c:6:19:MPU6050_Init	40	static
-../Core/Src/mpu6050.c:80:19:MPU6050_ReadData	48	static
-../Core/Src/mpu6050.c:120:6:MPU6050_ProcessData	16	static
-../Core/Src/mpu6050.c:141:9:MPU6050_ReadIntStatus	40	static
