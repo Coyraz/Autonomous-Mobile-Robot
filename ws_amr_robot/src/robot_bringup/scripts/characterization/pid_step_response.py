@@ -74,19 +74,22 @@ BAUD_RATE    = 115200
 
 # Physical constants
 WHEEL_DIAMETER  = 0.068
-TICKS_PER_REV   = 4600.0
+TICKS_PER_REV   = 4557.0   # measured 2026-06-20 (push test), was 4600
 M_PER_TICK      = (math.pi * WHEEL_DIAMETER) / TICKS_PER_REV
 MM_PER_TICK     = M_PER_TICK * 1000.0
 
 # Test parameters (can be overridden by command line args)
-DEFAULT_SPEED_MMPS = 300   # mm/s
+# 150 mm/s is within the robot's real range (~210 mm/s max). 300 would
+# saturate and show false steady-state error. Run 100/150/200 separately.
+DEFAULT_SPEED_MMPS = 150   # mm/s
 DEFAULT_DURATION   = 4.0   # seconds of recording after step
 
 # Timing
 SETTLE_BEFORE  = 0.5   # seconds at zero before step
 SETTLE_AFTER   = 1.0   # seconds at zero after step (coast down)
 
-OUTPUT_DIR  = os.path.expanduser('~')
+OUTPUT_DIR  = os.path.expanduser('~/thesis_data/PID_tune_STM32')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 TIMESTAMP   = datetime.now().strftime('%Y%m%d_%H%M%S')
 
 
@@ -576,7 +579,7 @@ def main():
         return
 
     # Save CSV
-    csv_file = os.path.join(OUTPUT_DIR, f'pid_step_{TIMESTAMP}.csv')
+    csv_file = os.path.join(OUTPUT_DIR, f'WITH_PID_step_{int(target)}mmps_{TIMESTAMP}.csv')
     save_csv(all_samples, csv_file)
 
     # Analyze forward response
@@ -589,7 +592,7 @@ def main():
         print_tuning_suggestion(analysis_left, analysis_right, target)
 
     # Generate plot
-    png_file = os.path.join(OUTPUT_DIR, f'pid_step_{TIMESTAMP}.png')
+    png_file = os.path.join(OUTPUT_DIR, f'WITH_PID_step_{int(target)}mmps_{TIMESTAMP}.png')
     plot_response(all_samples, target, png_file)
 
     print("\nDone. Send me:")

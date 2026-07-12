@@ -223,6 +223,35 @@ void CLaserOdometry2DNode::publish()
   odom.twist.twist.linear.x = rf2o_ref.lin_speed;    //linear speed
   odom.twist.twist.linear.y = 0.0;
   odom.twist.twist.angular.z = rf2o_ref.ang_speed;   //angular speed
+
+  // Covariance (2026-07-12 fix): previously never set, so this field was left at its
+  // default-constructed value (all zero) for both pose and twist. A zero covariance tells
+  // any Kalman consumer (e.g. robot_localization's EKF) "this measurement is known with
+  // ZERO uncertainty" -- mathematically invalid input, since a real measurement always has
+  // some noise. rf2o's own scan-matching solve already computes a genuine, per-scan
+  // increment (vx,vy,wz) covariance via getIncrementCovariance() (least-squares residual
+  // based), but it was being discarded instead of published.
+  const rf2o::IncrementCov& inc_cov = rf2o_ref.getIncrementCovariance();
+
+  // Twist covariance: direct mapping, this IS the covariance of (vx,vy,wz).
+  odom.twist.covariance[0]  = static_cast<double>(inc_cov(0, 0));  // vx-vx
+  odom.twist.covariance[7]  = static_cast<double>(inc_cov(1, 1));  // vy-vy
+  odom.twist.covariance[35] = static_cast<double>(inc_cov(2, 2));  // wz-wz
+
+  // Pose covariance: rf2o's algorithm only estimates the INCREMENT (velocity) covariance
+  // directly -- it does not maintain a properly propagated running POSE covariance (that
+  // would need full error propagation through the scan-matching history, a bigger change).
+  // Pragmatic fix: publish a conservative baseline uncertainty, scaled up by this scan's own
+  // match-quality proxy (trace of the increment covariance) -- a noisier scan match this
+  // cycle likely also means a less trustworthy position this cycle.
+  const double match_quality = static_cast<double>(inc_cov.trace());
+  const double base_xy_var  = 0.0025;   // ~5cm baseline std-dev
+  const double base_yaw_var = 0.0030;   // ~3deg baseline std-dev
+  const double quality_gain = 50.0;     // empirical scaling
+  odom.pose.covariance[0]  = base_xy_var  + quality_gain * match_quality;  // x
+  odom.pose.covariance[7]  = base_xy_var  + quality_gain * match_quality;  // y
+  odom.pose.covariance[35] = base_yaw_var + quality_gain * match_quality;  // yaw
+
   //publish the message
   odom_pub->publish(odom);
 

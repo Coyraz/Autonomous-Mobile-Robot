@@ -73,10 +73,11 @@ SETTLE_TIME    = 2.0   # seconds: wait for motor to reach steady speed
 MEASURE_TIME   = 3.0   # seconds: collect data during this window
 COOLDOWN_TIME  = 1.0   # seconds: stop between tests, protect motor
 
-# Output file location
-OUTPUT_DIR  = os.path.expanduser('~')
+# Output file location. Name makes it obvious this is the RAW (no-PID) data.
+OUTPUT_DIR  = os.path.expanduser('~/thesis_data/PID_tune_STM32')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 TIMESTAMP   = datetime.now().strftime('%Y%m%d_%H%M%S')
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, f'characterization_{TIMESTAMP}.csv')
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, f'RAW_openloop_no_pid_{TIMESTAMP}.csv')
 
 
 # ============================================================
@@ -132,6 +133,22 @@ def read_latest_telemetry(ser):
         except (json.JSONDecodeError, UnicodeDecodeError):
             pass
     return latest
+
+
+def read_all_telemetry(ser):
+    """Return a list of ALL complete JSON packets waiting in the buffer, in
+    order. Unlike read_latest_telemetry this keeps every packet, so no ticks
+    are lost between consecutive 50ms firmware messages. That keeps each
+    tick delta small and the 16-bit wrap correction safe."""
+    packets = []
+    while ser.in_waiting > 0:
+        try:
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+            if line.startswith('{') and line.endswith('}'):
+                packets.append(json.loads(line))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+    return packets
 
 
 def measure_wheel_speed(ser, left_pwm, right_pwm):
@@ -197,47 +214,42 @@ def measure_wheel_speed(ser, left_pwm, right_pwm):
         print("   Check that STM32 is running the characterization firmware.")
         return None
 
-    # Collect speed samples by computing delta between packets
+    # Process EVERY telemetry packet (not just the newest). The firmware tick
+    # field is a 16-bit counter that wraps at 65536. Between two consecutive
+    # 50ms packets the counter can only move a few thousand ticks, far below
+    # the 32767 wrap threshold, so each per-packet delta is always safe to
+    # wrap-correct. We sum these into accum_ticks. Discarding packets (the old
+    # bug) let the gap exceed 32767 and corrupted the count.
+    key = 'l' if measuring_left else 'r'
+    prev_tick   = first_data[key]
+    accum_ticks = 0
     speed_samples = []
-    last_data     = first_data
-    last_time     = first_time
+    last_time   = first_time
+    NOMINAL_DT  = 0.05   # firmware telemetry period, for the jitter estimate
 
-    measure_start = time.time()
-    measure_end   = measure_start + MEASURE_TIME
+    def wrap16(d):
+        d %= 65536
+        if d >= 32768:
+            d -= 65536
+        return d
+
+    measure_end = time.time() + MEASURE_TIME
 
     while time.time() < measure_end:
         send_pwm(ser, left_pwm, right_pwm)  # Keep refreshing the timeout
-        time.sleep(0.04)  # ~25Hz polling, faster than 20Hz telemetry is fine
+        time.sleep(0.02)
 
-        data = read_latest_telemetry(ser)
-        if data is None:
-            continue
-        if 'l' not in data or 'r' not in data:
-            continue
-
-        current_time = time.time()
-        dt = current_time - last_time
-
-        if dt < 0.001:
-            # Avoid division by zero if packets arrive too close together
-            continue
-
-        if measuring_left:
-            delta_ticks = data['l'] - last_data['l']
-        else:
-            delta_ticks = data['r'] - last_data['r']
-
-        # Convert ticks to speed
-        # speed = (ticks / dt) * m_per_tick
-        ticks_per_second = delta_ticks / dt
-        speed_mps = abs(ticks_per_second) * M_PER_TICK
-
-        # Record all non-zero speed samples (use abs so polarity does not matter)
-        if speed_mps >= 0:
-            speed_samples.append(speed_mps)
-
-            last_data = data
-            last_time = current_time
+        packets = read_all_telemetry(ser)
+        for pkt in packets:
+            if key not in pkt:
+                continue
+            delta = wrap16(pkt[key] - prev_tick)
+            accum_ticks += delta
+            prev_tick = pkt[key]
+            # per-packet speed, jitter indicator only (nominal 50ms period)
+            speed_samples.append(abs(delta) * M_PER_TICK / NOMINAL_DT)
+        if packets:
+            last_time = time.time()
 
     print(" done.")
 
@@ -253,20 +265,28 @@ def measure_wheel_speed(ser, left_pwm, right_pwm):
             'samples':          0
         }
 
-    # Calculate statistics
-    avg_speed = sum(speed_samples) / len(speed_samples)
-    avg_tps   = avg_speed / M_PER_TICK  # Back to ticks per second for logging
-
-    variance  = sum((s - avg_speed) ** 2 for s in speed_samples) / len(speed_samples)
-    std_speed = math.sqrt(variance)
-
-    # Total ticks in measurement window (for reference)
-    if measuring_left:
-        total_ticks = last_data['l'] - first_data['l']
-    else:
-        total_ticks = last_data['r'] - first_data['r']
-
+    # --- WINDOW-BASED SPEED (robust, wrap-corrected) ---
+    # Use the wrap-corrected TOTAL ticks over the WHOLE window divided by the
+    # total elapsed time. This is immune to both the 16-bit counter wrap and
+    # the per-read dt jitter, giving a clean steady speed.
+    total_ticks     = accum_ticks
     actual_duration = last_time - first_time
+
+    if actual_duration <= 0.001:
+        return None
+
+    avg_tps   = abs(total_ticks) / actual_duration
+    avg_speed = avg_tps * M_PER_TICK
+
+    # std of the per-sample speeds is kept only as a JITTER indicator (it is
+    # dominated by dt noise, not real motor variation, so do not read it as
+    # motor instability).
+    if len(speed_samples) > 1:
+        mean_s   = sum(speed_samples) / len(speed_samples)
+        variance = sum((s - mean_s) ** 2 for s in speed_samples) / len(speed_samples)
+        std_speed = math.sqrt(variance)
+    else:
+        std_speed = 0.0
 
     return {
         'avg_speed_mps':    avg_speed,

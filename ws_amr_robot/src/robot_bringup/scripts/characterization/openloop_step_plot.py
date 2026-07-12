@@ -38,7 +38,7 @@ from datetime import datetime
 # ============================================================
 SERIAL_PORT  = '/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A5069RR4-if00-port0'
 BAUD_RATE    = 115200
-MM_PER_TICK  = 0.04644      # mm per tick = pi * 68mm / 4600 ticks
+MM_PER_TICK  = 0.04688      # mm per tick = pi * 68mm / 4557 ticks (calibrated 2026-06-20)
 WHEEL_DIAM   = 0.068        # meter
 TIMESTAMP    = datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -57,16 +57,10 @@ def connect(port, baud):
     ser = serial.Serial(port, baud, timeout=0.15)
     ser.reset_input_buffer()
     time.sleep(0.6)
-    # Baca satu baris untuk deteksi firmware
-    line = ser.readline().decode('utf-8', errors='ignore').strip()
-    if '"gz"' in line or '"ax"' in line:
-        ser.close()
-        raise RuntimeError(
-            "\nFIRMWARE SALAH. Terdeteksi firmware PID (ada field gz/ax).\n"
-            "Flash freertos_characterization.c ke STM32 dulu,\n"
-            "lalu jalankan ulang script ini.")
-    print(f"  OK. Firmware characterization terdeteksi.")
+    # Accept both PID firmware (has gz/ax fields) and characterization firmware.
+    # Both support P: raw PWM command (g_raw_mode=1, bypasses PID).
     ser.reset_input_buffer()
+    print(f"  OK. Terhubung.")
     return ser
 
 
@@ -126,37 +120,60 @@ def record(ser, pwm, wheel, hold_secs):
     prev_pkt  = None
     prev_time = None   # float detik dari time.time()
     t_zero    = None   # waktu t=0 untuk elapsed
+    # Accumulator for merging packets across timing hiccups
+    accum_l   = 0
+    accum_r   = 0
+    accum_t   = 0.0    # accumulated wall-clock time
+
+    def wrap16(d):
+        d %= 65536
+        if d >= 32768:
+            d -= 65536
+        return d
+
+    # Number of packets accumulated in current window
+    accum_n = 0
 
     def process(pkt, recv_time, phase, l_cmd, r_cmd):
         nonlocal prev_pkt, prev_time, t_zero
+        nonlocal accum_l, accum_r, accum_t, accum_n
 
         if prev_pkt is None:
             prev_pkt  = pkt
             prev_time = recv_time
             return None
 
-        dt = recv_time - prev_time
+        py_dt = recv_time - prev_time
 
-        # Filter: abaikan jika dt di luar range wajar
-        if dt < DT_MIN or dt > DT_MAX:
-            # Update prev tetap, tapi jangan hitung speed
+        if py_dt < DT_MIN:
             prev_pkt  = pkt
             prev_time = recv_time
             return None
 
-        # Delta ticks
-        l_delta =  (pkt['l'] - prev_pkt['l'])
-        r_delta = -(pkt['r'] - prev_pkt['r'])   # polarity flip kanan
+        # Accumulate tick deltas
+        accum_l += wrap16(pkt['l'] - prev_pkt['l'])
+        accum_r += -wrap16(pkt['r'] - prev_pkt['r'])
+        accum_t += py_dt
+        accum_n += 1
 
-        # Kecepatan
-        l_mmps = (l_delta * MM_PER_TICK) / dt
-        r_mmps = (r_delta * MM_PER_TICK) / dt
+        prev_pkt  = pkt
+        prev_time = recv_time
+
+        # Emit only when we have accumulated at least 2 normal packets
+        # (~100ms). This merges both the 40/60ms Python timing jitter
+        # AND the periodic I2C stalls (120-200ms gaps) with the
+        # following packet, so the ticks and time always match.
+        if accum_n < 2:
+            return None
+
+        l_mmps = (accum_l * MM_PER_TICK) / accum_t
+        r_mmps = (accum_r * MM_PER_TICK) / accum_t
 
         def to_rpm(mmps):
             return (mmps / 1000.0) * 60.0 / (math.pi * WHEEL_DIAM)
 
         s = {
-            't':          round(recv_time - t_zero, 4),  # elapsed detik
+            't':          round(recv_time - t_zero, 4),
             'phase':      phase,
             'l_pwm':      l_cmd,
             'r_pwm':      r_cmd,
@@ -166,11 +183,14 @@ def record(ser, pwm, wheel, hold_secs):
             'right_rpm':  round(to_rpm(r_mmps), 2),
             'l_ticks':    pkt['l'],
             'r_ticks':    pkt['r'],
-            'dt':         round(dt, 5),
+            'dt':         round(accum_t, 5),
         }
 
-        prev_pkt  = pkt
-        prev_time = recv_time
+        # Reset accumulator for next window
+        accum_l = 0
+        accum_r = 0
+        accum_t = 0.0
+        accum_n = 0
         return s
 
     # Tentukan PWM per roda
@@ -393,6 +413,20 @@ def plot(samples, res, pwm, wheel, outfile):
     r_rpm_v = [s['right_rpm']  for s in samples]
     phases  = [s['phase']      for s in samples]
 
+    def moving_avg(data, window=7):
+        out = []
+        half = window // 2
+        for i in range(len(data)):
+            lo = max(0, i - half)
+            hi = min(len(data), i + half + 1)
+            out.append(sum(data[lo:hi]) / (hi - lo))
+        return out
+
+    l_spd_smooth   = moving_avg(l_spd)
+    r_spd_smooth   = moving_avg(r_spd)
+    l_rpm_smooth   = moving_avg(l_rpm_v)
+    r_rpm_smooth   = moving_avg(r_rpm_v)
+
     # Batas phase
     pb = {}
     for t, ph in zip(times, phases):
@@ -427,11 +461,15 @@ def plot(samples, res, pwm, wheel, outfile):
     # Panel 1: Speed mm/s
     ax1 = axes[0]
     if wheel != 'right':
-        ax1.plot(times, l_spd, color='#1565C0', linewidth=1.8,
-                 alpha=0.85, label='Roda kiri (encoder)')
+        ax1.plot(times, l_spd, color='#1565C0', linewidth=0.5,
+                 alpha=0.25)
+        ax1.plot(times, l_spd_smooth, color='#1565C0', linewidth=2.0,
+                 alpha=0.9, label='Roda kiri')
     if wheel != 'left':
-        ax1.plot(times, r_spd, color='#C62828', linewidth=1.8,
-                 alpha=0.85, label='Roda kanan (encoder)')
+        ax1.plot(times, r_spd, color='#C62828', linewidth=0.5,
+                 alpha=0.25)
+        ax1.plot(times, r_spd_smooth, color='#C62828', linewidth=2.0,
+                 alpha=0.9, label='Roda kanan')
 
     # Kurva fit eksponensial
     if res and res['fit_Vmax'] and res['fit_tau'] and 'step' in pb:
@@ -498,11 +536,15 @@ def plot(samples, res, pwm, wheel, outfile):
     # Panel 2: RPM
     ax2 = axes[1]
     if wheel != 'right':
-        ax2.plot(times, l_rpm_v, color='#1565C0', linewidth=1.8,
-                 alpha=0.85, label='Roda kiri (RPM)')
+        ax2.plot(times, l_rpm_v, color='#1565C0', linewidth=0.5,
+                 alpha=0.25)
+        ax2.plot(times, l_rpm_smooth, color='#1565C0', linewidth=2.0,
+                 alpha=0.9, label='Roda kiri (RPM)')
     if wheel != 'left':
-        ax2.plot(times, r_rpm_v, color='#C62828', linewidth=1.8,
-                 alpha=0.85, label='Roda kanan (RPM)')
+        ax2.plot(times, r_rpm_v, color='#C62828', linewidth=0.5,
+                 alpha=0.25)
+        ax2.plot(times, r_rpm_smooth, color='#C62828', linewidth=2.0,
+                 alpha=0.9, label='Roda kanan (RPM)')
 
     # Kurva fit RPM
     if res and res['fit_Vmax'] and res['fit_tau'] and 'step' in pb:
@@ -565,11 +607,11 @@ def main():
         description='Open Loop Step Response (characterization firmware)')
     parser.add_argument('--pwm',   type=int, default=999,
                         help='Target PWM 0-999 (default: 999)')
-    parser.add_argument('--hold',  type=int, default=30,
-                        help='Hold time detik (default: 30)')
+    parser.add_argument('--hold',  type=int, default=15,
+                        help='Hold time detik (default: 15)')
     parser.add_argument('--wheel', choices=['left','right','both'],
                         default='both')
-    parser.add_argument('--outdir', default=os.path.expanduser('~'))
+    parser.add_argument('--outdir', default=os.path.expanduser('~/thesis_data/openloop_step_response'))
     args = parser.parse_args()
 
     pwm   = max(0, min(999, args.pwm))

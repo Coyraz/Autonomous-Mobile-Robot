@@ -20,6 +20,10 @@ setup(
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
         # [PERBAIKAN MUTLAK] Include folder maps agar peta disalin ke ruang eksekusi
         (os.path.join('share', package_name, 'maps'), glob('maps/*')),
+        # Custom SmacLattice primitives (turning_radius fit to this robot, 2026-07-06)
+        (os.path.join('share', package_name, 'config', 'lattice_primitives',
+                       '0.35m_turning_radius', 'diff'),
+         glob('config/lattice_primitives/0.35m_turning_radius/diff/*.json')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -36,6 +40,7 @@ setup(
             'custom_path_controller = robot_bringup.custom_path_controller:main',
             'teleop_keyboard = robot_bringup.teleop_keyboard:main',
             'teleop_translator = robot_bringup.teleop_translator:main',
+            'odom_tf_broadcaster = robot_bringup.odom_tf_broadcaster:main',
         ],
     },
 )

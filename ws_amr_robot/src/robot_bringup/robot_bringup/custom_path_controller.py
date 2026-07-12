@@ -43,16 +43,18 @@ ARCHITECTURE
 import csv
 import math
 import os
+import threading
 import time
 from datetime import datetime
 
 import rclpy
 from rclpy.node import Node
-from rclpy.action import ActionServer, ActionClient
+from rclpy.action import ActionServer, ActionClient, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 
 from geometry_msgs.msg import Twist, PoseStamped
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, OccupancyGrid, Odometry
+from std_msgs.msg import Float64MultiArray
 from nav2_msgs.action import NavigateToPose, ComputePathToPose
 
 import tf2_ros
@@ -86,7 +88,16 @@ class CustomPathController(Node):
         self.declare_parameter('lookahead_min', 0.25)
         self.declare_parameter('lookahead_max', 0.60)
         self.declare_parameter('lookahead_gain', 1.0)       # Ld = gain*v + min
-        self.declare_parameter('crosstrack_gain', 0.8)      # Stanley-style k
+        # use_pd_heading: True -> prof's filtered-PD heading law (Kp/Kd/Tf below).
+        # False -> raw Pure Pursuit curvature (w = v * curvature), no PD at all.
+        # Defaulted False 2026-07-06: field tests showed severe oscillation with
+        # PD regardless of gains/lookahead -- suspected SmacLattice path quality,
+        # not the heading law itself. Flip back to True after resolving with prof.
+        self.declare_parameter('use_pd_heading', False)
+        self.declare_parameter('heading_kp', 2.70)          # PD heading: proportional gain
+        self.declare_parameter('heading_kd', 0.44)          # PD heading: derivative gain
+        self.declare_parameter('heading_tf', 0.05)          # PD heading: derivative filter time const Tf (s)
+        self.declare_parameter('crosstrack_gain', 0.5)      # Stanley-style k
         self.declare_parameter('curve_slowdown', 1.5)       # higher = slower on curves
         self.declare_parameter('goal_xy_tolerance', 0.12)
         self.declare_parameter('goal_yaw_tolerance', 0.15)
@@ -98,6 +109,17 @@ class CustomPathController(Node):
         self.declare_parameter('cmd_vel_topic', 'cmd_vel_nav')
         self.declare_parameter('enable_tuning_log', True)  # CSV of tracking error
 
+        # ---- RPP-style obstacle awareness (needs the local costmap) ----
+        self.declare_parameter('use_obstacle_costmap', True)
+        # In custom mode controller_server (and its local_costmap) is not run,
+        # so we read the global costmap from planner_server, which has the
+        # obstacle + inflation + keepout layers and runs in every mode.
+        self.declare_parameter('costmap_topic', '/global_costmap/costmap')
+        self.declare_parameter('cost_slow_gain', 0.7)        # 0 = off, 1 = strong slowdown near cost
+        self.declare_parameter('cost_slow_min_ratio', 0.25)  # never slow below this fraction of v
+        self.declare_parameter('collision_cost', 99)         # >= this along the arc => stop (99 = inscribed)
+        self.declare_parameter('collision_horizon', 1.2)     # seconds to project the arc forward
+
         gp = self.get_parameter
         self.hz          = gp('control_frequency').value
         self.v_max       = gp('max_linear_speed').value
@@ -107,7 +129,17 @@ class CustomPathController(Node):
         self.ld_min      = gp('lookahead_min').value
         self.ld_max      = gp('lookahead_max').value
         self.ld_gain     = gp('lookahead_gain').value
+        self.use_pd_heading = gp('use_pd_heading').value
+        self.kp_h        = gp('heading_kp').value
+        self.kd_h        = gp('heading_kd').value
+        self.tf_h        = gp('heading_tf').value
         self.k_ct        = gp('crosstrack_gain').value
+        self._prev_alpha = 0.0   # previous heading error (alpha) for D term
+        self._df         = 0.0   # filtered derivative state D_f[k-1]
+        # First-order derivative-filter coefficient: alpha_f = exp(-Ts/Tf).
+        # Ts = control period (1/control_frequency). Larger Tf -> more smoothing.
+        _ts = 1.0 / self.hz
+        self._df_alpha   = math.exp(-_ts / self.tf_h) if self.tf_h > 1e-6 else 0.0
         self.curve_slow  = gp('curve_slowdown').value
         self.tol_xy      = gp('goal_xy_tolerance').value
         self.tol_yaw     = gp('goal_yaw_tolerance').value
@@ -118,6 +150,40 @@ class CustomPathController(Node):
         self.robot_frame  = gp('robot_frame').value
         self.enable_log   = gp('enable_tuning_log').value
         self.log_dir = os.path.expanduser('~/thesis_data/controller_tuning')
+
+        self.use_costmap   = gp('use_obstacle_costmap').value
+        self.cost_slow_k   = gp('cost_slow_gain').value
+        self.cost_slow_min = gp('cost_slow_min_ratio').value
+        self.collision_cost = gp('collision_cost').value
+        self.collision_hz  = gp('collision_horizon').value
+        self._costmap = None   # latest OccupancyGrid snapshot
+
+        # measured angular velocity from wheel-encoder speed DIFFERENTIAL
+        # (odometry_node.py: vyaw = d_theta/dt from raw ticks, NOT AMCL/EKF-
+        # fused) -- the "hasil" (actual response) the professor wants checked
+        # against the PP setpoint (alpha), same units (rad, rad/s), to verify
+        # the PD/curvature heading law is actually correcting what it should.
+        self._w_odom = 0.0
+        self._dbg_alpha = 0.0
+
+        # ---- goal preemption ----
+        # 2026-07-07: rclpy's ActionServer defaults to ACCEPTING every goal
+        # and running EACH one's execute_callback concurrently (one thread
+        # per goal, via MultiThreadedExecutor) unless told otherwise. With no
+        # goal/handle_accepted callback here, sending a second goal before
+        # the first finishes (e.g. double-clicking ils_gui, or FollowWaypoints
+        # racing a manual go_to_rack) started a SECOND run_path() loop that
+        # published cmd_vel_nav concurrently with the first -- confirmed live
+        # via two tuning-log CSVs growing at the same timestamp with
+        # different trajectories. This also explained "Stop Nav doesn't
+        # work": cancelling only touched whichever ONE goal_handle ils_gui
+        # happened to be tracking, leaving the other to drive the robot
+        # forever. Fix: a monotonic generation counter -- each new goal
+        # bumps it and stores its own number; run_path()'s loop bails out as
+        # soon as it sees a newer generation has taken over, regardless of
+        # the action framework's own cancel state.
+        self._goal_generation = 0
+        self._goal_gen_lock = threading.Lock()
 
         # ---- TF (map -> base_link pose) ----
         self.tf_buffer = tf2_ros.Buffer()
@@ -135,6 +201,9 @@ class CustomPathController(Node):
         self.nav_server = ActionServer(
             self, NavigateToPose, 'navigate_to_pose',
             execute_callback=self.execute_navigate,
+            # Without this, rclpy REJECTS all cancels by default, so ils_gui's
+            # "Stop Nav" and the teleop override could not stop an active goal.
+            cancel_callback=lambda goal_handle: CancelResponse.ACCEPT,
             callback_group=cb)
 
         # quick-test entry: send a PoseStamped on /goal_pose (e.g. from RViz).
@@ -142,6 +211,23 @@ class CustomPathController(Node):
         # thread, like the action server, instead of stalling the default group.
         self.create_subscription(PoseStamped, '/goal_pose', self.cb_goal_pose, 1,
                                  callback_group=cb)
+
+        # local costmap, for the RPP-style obstacle slowdown + collision stop
+        if self.use_costmap:
+            self.create_subscription(
+                OccupancyGrid, gp('costmap_topic').value,
+                self._cb_costmap, 1, callback_group=cb)
+
+        # measured angular velocity from wheel encoders (see _w_odom above)
+        self.create_subscription(Odometry, '/odom', self._cb_odom, 20,
+                                 callback_group=cb)
+
+        # debug: [alpha_rad, w_heading_radps, w_cmd_radps, w_odom_radps] each
+        # control tick -- lets an external recorder verify the PP setpoint
+        # (alpha) against the actual wheel-encoder heading response (w_odom)
+        # in matching units, per the professor's requested check.
+        self.debug_pub = self.create_publisher(
+            Float64MultiArray, 'heading_debug', 10)
 
         self.get_logger().info(
             'custom_path_controller ready. Replacing DWB. '
@@ -161,6 +247,57 @@ class CustomPathController(Node):
         y = t.transform.translation.y
         yaw = yaw_from_quat(t.transform.rotation)
         return (x, y, yaw)
+
+    # ------------------------------------------------- obstacle awareness (RPP)
+    def _cb_odom(self, msg):
+        # angular.z here is odometry_node.py's vyaw = d_theta/dt, computed
+        # directly from (d_right_ticks - d_left_ticks)/wheel_base/dt -- the
+        # wheel-speed-differential heading rate, independent of AMCL/EKF.
+        self._w_odom = msg.twist.twist.angular.z
+
+    def _cb_costmap(self, msg):
+        # Store the latest local costmap. OccupancyGrid cost values are
+        # 0 (free) .. 99 (inscribed) .. 100 (lethal), -1 unknown. Reference
+        # assignment is atomic under the GIL, so no lock is needed for reads.
+        self._costmap = msg
+
+    def _cost_at(self, wx, wy):
+        """Cost at a world point, or None if no costmap / outside its bounds."""
+        cm = self._costmap
+        if cm is None:
+            return None
+        info = cm.info
+        mx = int((wx - info.origin.position.x) / info.resolution)
+        my = int((wy - info.origin.position.y) / info.resolution)
+        if mx < 0 or my < 0 or mx >= info.width or my >= info.height:
+            return None
+        return cm.data[my * info.width + mx]
+
+    def _arc_blocked(self, rx, ry, ryaw, v, w):
+        """Project the (v, w) arc forward collision_horizon seconds; True if it
+        crosses a cell at or above collision_cost (a real obstacle)."""
+        if v <= 0.0 or self._costmap is None:
+            return False
+        dt = 0.1
+        x, y, th = rx, ry, ryaw
+        for _ in range(int(self.collision_hz / dt)):
+            x += v * math.cos(th) * dt
+            y += v * math.sin(th) * dt
+            th += w * dt
+            c = self._cost_at(x, y)
+            if c is not None and c >= self.collision_cost:
+                return True
+        return False
+
+    def _cost_slowdown(self, rx, ry, v):
+        """RPP-style: slow down when the robot sits in higher-cost cells (near
+        obstacles). At the centre of a clear aisle the cost is 0, so this does
+        nothing there and only bites when the robot drifts toward a wall."""
+        c = self._cost_at(rx, ry)
+        if c is None or c <= 0:
+            return v
+        factor = max(self.cost_slow_min, 1.0 - self.cost_slow_k * (c / 100.0))
+        return v * factor
 
     def _wait_future(self, future, timeout_sec=10.0):
         """
@@ -283,8 +420,43 @@ class CustomPathController(Node):
             cmd.angular.z = max(-self.w_max, min(self.w_max, cmd.angular.z))
             return cmd, False
 
-        # ---- Pure Pursuit curvature: gamma = 2*y_r / L^2 ----
-        curvature = 2.0 * y_r / (L * L)
+        # ---- PP heading setpoint: angle to lookahead point in robot frame ----
+        # This is what the professor calls the "set point" from Pure Pursuit.
+        # alpha > 0: lookahead is to the left; alpha < 0: to the right.
+        alpha = math.atan2(y_r, x_r)
+
+        # ---- velocity profiling: slow on curves and near the goal ----
+        # (moved above the heading law so the curvature fallback below can
+        # scale by the actual profiled speed, matching its original design)
+        v = self.v_max / (1.0 + self.curve_slow * abs(alpha))
+        if dist_to_goal < self.approach:
+            v *= max(0.25, dist_to_goal / self.approach)
+        v = max(self.v_min, min(self.v_max, v))
+
+        # ---- RPP-style cost-regulated slowdown (slow near obstacles) ----
+        if self.use_costmap:
+            v = self._cost_slowdown(rx, ry, v)
+
+        if self.use_pd_heading:
+            # ---- PD heading controller with FILTERED derivative (prof's design) ----
+            #   C_theta(s) = Kp + Kd * s/(Tf*s + 1)
+            # PP supplies the setpoint (alpha); the D term damps theta oscillation,
+            # and the first-order filter (Tf) rejects high-frequency noise on it.
+            # Discrete filter:  D_f[k] = a*D_f[k-1] + (1-a)*D_raw[k],  a = exp(-Ts/Tf)
+            d_raw = (alpha - self._prev_alpha) * self.hz
+            self._prev_alpha = alpha
+            self._df = self._df_alpha * self._df + (1.0 - self._df_alpha) * d_raw
+            w_heading = self.kp_h * alpha + self.kd_h * self._df
+        else:
+            # ---- FALLBACK: raw Pure Pursuit curvature (no PD) ----
+            # Temporarily reverted 2026-07-06: field tests showed severe theta
+            # oscillation (>100 deg swings) with the PD law regardless of Kp/Kd
+            # tuning or lookahead distance -- symptom points to the SmacLattice
+            # path itself (generic, non-robot-specific primitives) rather than
+            # the heading law. Flip 'use_pd_heading' back to true once this is
+            # resolved with the professor. See test11.md for the diagnostic data.
+            curvature = 2.0 * y_r / (L * L)
+            w_heading = v * curvature
 
         # ---- cross-track correction (Stanley-style), tangent at closest point ----
         if i0 + 1 < len(pts):
@@ -298,14 +470,8 @@ class CustomPathController(Node):
         ey = pts[i0][1] - ry
         e_ct = -math.sin(tang) * ex + math.cos(tang) * ey
 
-        # ---- velocity profiling: slow on curves and near the goal ----
-        v = self.v_max / (1.0 + self.curve_slow * abs(curvature))
-        if dist_to_goal < self.approach:
-            v *= max(0.25, dist_to_goal / self.approach)
-        v = max(self.v_min, min(self.v_max, v))
-
-        # angular = pure pursuit term + cross-track term
-        w = v * curvature + self.k_ct * e_ct
+        # angular = heading term (PD or curvature) + cross-track correction
+        w = w_heading + self.k_ct * e_ct
 
         # ---- deadband handling (the fix for straight-line oscillation) ----
         # We are in the MOVING branch here (pure in-place rotation is handled by
@@ -321,35 +487,72 @@ class CustomPathController(Node):
             w = 0.0
         w = max(-self.w_max, min(self.w_max, w))
 
+        # ---- RPP-style collision stop: if the planned arc hits an obstacle in
+        #      the next collision_horizon seconds, hold still and wait. Checks
+        #      only real obstacles (>= collision_cost), so inflation in the tight
+        #      aisle does not false-stop us. Goal is NOT aborted; we resume when
+        #      the obstacle clears. ----
+        if self.use_costmap and self._arc_blocked(rx, ry, ryaw, v, w):
+            self.get_logger().warn('Obstacle ahead, holding.',
+                                   throttle_duration_sec=1.0)
+            self._dbg_ct = e_ct
+            self._dbg_he = head_err
+            return Twist(), False
+
         # stash for the tuning log
         self._dbg_ct = e_ct
         self._dbg_he = head_err
+        self._dbg_alpha = alpha
+
+        # setpoint (alpha) vs actual wheel-encoder heading response (w_odom),
+        # both in rad / rad/s -- see the professor's requested cross-check.
+        dbg = Float64MultiArray()
+        dbg.data = [alpha, w_heading, w, self._w_odom]
+        self.debug_pub.publish(dbg)
 
         cmd.linear.x = float(v)
         cmd.angular.z = float(w)
         return cmd, False
 
     # ----------------------------------------------------- action / run loop
-    def run_path(self, path, goal_pose, action_handle=None):
+    def run_path(self, path, goal_pose, action_handle=None, my_gen=None):
         """Drive along path until the goal is reached. Returns True on success."""
         pts = self.path_xy(path)
         goal_xy = (goal_pose.pose.position.x, goal_pose.pose.position.y)
         goal_yaw = yaw_from_quat(goal_pose.pose.orientation)
         self._last_idx = 0
-        self._final_align = False   # reset the capture latch for this goal
+        self._final_align = False
+        self._prev_alpha = 0.0   # reset D term history for each new goal
+        self._df         = 0.0   # reset filtered-derivative state
 
         logger = self._open_log()
         t0 = time.time()
-        rate = self.create_rate(self.hz)
+        # Plain time.sleep() instead of Node.create_rate(): rclpy's Rate
+        # object is known to cause excessive executor wake-ups (near-100%
+        # single-core CPU even at a modest 25Hz) when used with
+        # MultiThreadedExecutor -- observed 2026-07-07 alongside high system
+        # load/CPU temp, suspected of starving AMCL enough to cause delayed
+        # corrections ("hang then jump" reports). A plain sleep is a
+        # low-risk drop-in fix; drifts slightly under load (no compensation
+        # for compute_cmd() time) but that's an acceptable trade for a
+        # control loop that isn't hard-real-time.
+        period = 1.0 / self.hz
+        self._last_run_preempted = False
         try:
             while rclpy.ok():
+                if my_gen is not None and my_gen != self._goal_generation:
+                    # a newer goal has taken over this node -- yield the
+                    # robot to it instead of continuing to fight for cmd_vel
+                    self.stop()
+                    self._last_run_preempted = True
+                    return False
                 if action_handle is not None and action_handle.is_cancel_requested:
                     self.stop()
                     return False
                 pose = self.get_robot_pose()
                 if pose is None:
                     self.stop()
-                    rate.sleep()
+                    time.sleep(period)
                     continue
                 cmd, done = self.compute_cmd(pose, pts, goal_xy, goal_yaw)
                 self.cmd_pub.publish(cmd)
@@ -358,12 +561,13 @@ class CustomPathController(Node):
                         f'{time.time() - t0:.3f}',
                         f'{pose[0]:.4f}', f'{pose[1]:.4f}', f'{pose[2]:.4f}',
                         f'{self._dbg_ct:.4f}', f'{self._dbg_he:.4f}',
-                        f'{cmd.linear.x:.4f}', f'{cmd.angular.z:.4f}'
+                        f'{cmd.linear.x:.4f}', f'{cmd.angular.z:.4f}',
+                        f'{self._dbg_alpha:.4f}', f'{self._w_odom:.4f}'
                     ])
                 if done:
                     self.stop()
                     return True
-                rate.sleep()
+                time.sleep(period)
         finally:
             self._close_log()
         self.stop()
@@ -381,7 +585,8 @@ class CustomPathController(Node):
         w = csv.writer(self._log_file)
         w.writerow(['t_s', 'x_m', 'y_m', 'yaw_rad',
                     'cross_track_err_m', 'heading_err_rad',
-                    'v_cmd_mps', 'w_cmd_radps'])
+                    'v_cmd_mps', 'w_cmd_radps',
+                    'alpha_rad', 'w_odom_radps'])
         self.get_logger().info('Tuning log: %s' % path)
         return w
 
@@ -392,15 +597,26 @@ class CustomPathController(Node):
 
     def execute_navigate(self, goal_handle):
         """navigate_to_pose action: plan a global path, then track it."""
+        # Claim this generation BEFORE planning starts, so a second goal
+        # arriving while we're still waiting on request_global_path() also
+        # correctly preempts us (not just once run_path()'s loop begins).
+        with self._goal_gen_lock:
+            self._goal_generation += 1
+            my_gen = self._goal_generation
+
         goal_pose = goal_handle.request.pose
         self.get_logger().info('Goal received. Requesting global path...')
         path = self.request_global_path(goal_pose)
+        if my_gen != self._goal_generation:
+            # preempted while planning -- don't even start driving
+            goal_handle.abort()
+            return NavigateToPose.Result()
         if path is None:
             goal_handle.abort()
             return NavigateToPose.Result()
         self.get_logger().info('Path has %d points. Tracking with Pure Pursuit.'
                                % len(path.poses))
-        ok = self.run_path(path, goal_pose, action_handle=goal_handle)
+        ok = self.run_path(path, goal_pose, action_handle=goal_handle, my_gen=my_gen)
         if ok:
             goal_handle.succeed()
             self.get_logger().info('Goal reached.')
@@ -408,15 +624,21 @@ class CustomPathController(Node):
             if goal_handle.is_cancel_requested:
                 goal_handle.canceled()
             else:
+                # covers both a real failure and being preempted by a newer
+                # goal (self._last_run_preempted) -- either way this
+                # specific goal did not complete
                 goal_handle.abort()
         return NavigateToPose.Result()
 
     def cb_goal_pose(self, msg):
         """Quick test path: /goal_pose -> plan -> track (blocks the executor)."""
+        with self._goal_gen_lock:
+            self._goal_generation += 1
+            my_gen = self._goal_generation
         self.get_logger().info('/goal_pose received (quick test).')
         path = self.request_global_path(msg)
-        if path is not None:
-            self.run_path(path, msg)
+        if path is not None and my_gen == self._goal_generation:
+            self.run_path(path, msg, my_gen=my_gen)
 
     def stop(self):
         self.cmd_pub.publish(Twist())

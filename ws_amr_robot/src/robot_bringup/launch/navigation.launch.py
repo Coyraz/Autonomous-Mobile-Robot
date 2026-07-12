@@ -7,7 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 #   "custom" -> our own Pure Pursuit node (custom_path_controller)
 #   "dwb"    -> stock Nav2 DWB
 #   "rpp"    -> stock Nav2 Regulated Pure Pursuit (controller_rpp.yaml)
-CONTROLLER = "rpp"
+CONTROLLER = "custom"
 
 
 def generate_launch_description():
@@ -16,7 +16,7 @@ def generate_launch_description():
     bt_navigator_dir = get_package_share_directory('nav2_bt_navigator')
 
     # 2. File locations
-    map_file        = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_edited.yaml')
+    map_file        = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_edited_edited.yaml')
     keepout_file    = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_keepout.yaml')
     nav2_params_file = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     custom_ctrl_file = os.path.join(pkg_bringup, 'config', 'custom_controller.yaml')
@@ -122,6 +122,21 @@ def generate_launch_description():
             parameters=[custom_ctrl_file]
         )
         nodes.append(custom_path_controller)
+
+        # Stock nav2_waypoint_follower for ils_gui's multi-rack GUI feature.
+        # It just calls the 'navigate_to_pose' action repeatedly, which
+        # custom_path_controller already serves under that same name -- no
+        # bt_navigator/controller_server needed. Idle (no publishers/CPU use)
+        # unless something calls the /follow_waypoints action.
+        waypoint_follower = Node(
+            package='nav2_waypoint_follower',
+            executable='waypoint_follower',
+            name='waypoint_follower',
+            output='screen',
+            parameters=[nav2_params_file]
+        )
+        nodes.append(waypoint_follower)
+        lifecycle_nodes.append('waypoint_follower')
 
     else:
         # Stock Nav2 controller_server stack (DWB or RPP). Both use the same

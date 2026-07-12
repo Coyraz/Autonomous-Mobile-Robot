@@ -42,6 +42,11 @@ pkill -9 -f "waypoint_follower"
 pkill -9 -f "velocity_smoother"
 pkill -9 -f "lifecycle_manager"
 
+# Our custom controller (2026-07-06: added -- missing here let this become
+# an orphan multiple times when it was restarted standalone during
+# troubleshooting, then a full relaunch created a duplicate alongside it)
+pkill -9 -f "custom_path_controller"
+
 # SLAM stack
 pkill -9 -f "async_slam_toolbox_node"
 pkill -9 -f "slam_toolbox"
@@ -55,7 +60,7 @@ sleep 3
 
 # Step 5: Check for survivors
 echo "Checking survivors..."
-SURVIVORS=$(ps aux | grep -E "stm32_bridge|rf2o|slam_toolbox|ekf_node|lifecycle|amcl|controller_server|planner_server|bt_navigator|velocity_smoother|foxglove" | grep -v grep)
+SURVIVORS=$(ps aux | grep -E "stm32_bridge|rf2o|slam_toolbox|ekf_node|lifecycle|amcl|controller_server|planner_server|bt_navigator|velocity_smoother|foxglove|custom_path_controller" | grep -v grep)
 
 if [ -z "$SURVIVORS" ]; then
     echo "All clean. Safe to relaunch."

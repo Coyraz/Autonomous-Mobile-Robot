@@ -12,8 +12,8 @@ class OdometryNode(Node):
 
         # --- KONFIGURASI FISIK ---
         self.wheel_diameter = 0.068
-        self.wheel_base = 0.292
-        self.ticks_per_rev = 4600.0
+        self.wheel_base = 0.299
+        self.ticks_per_rev = 4557.0   # measured 2026-06-20: avg of 9 clean 0.80m pushes (L 4566 / R 4548)
 
         # --- POLARITAS (Sesuai data empiris terakhir) ---
         self.polarity_left = 1.0

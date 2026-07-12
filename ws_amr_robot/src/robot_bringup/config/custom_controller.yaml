@@ -9,13 +9,36 @@ custom_path_controller:
     min_angular_speed: 0.55      # rad/s, motor rotation deadband
 
     # Pure Pursuit lookahead:  Ld = lookahead_gain * v + lookahead_min
+    # (reverted to original values 2026-07-06 -- raising lookahead to
+    # 0.45/0.70/0.5 during PD diagnosis made oscillation WORSE, not better,
+    # supporting the SmacLattice-path-quality theory over a lookahead-tuning fix)
     lookahead_min: 0.25
     lookahead_max: 0.40
     lookahead_gain: 0.3
 
+    # use_pd_heading: false -> raw Pure Pursuit curvature (w = v*curvature), no PD.
+    # true -> prof's filtered-PD heading law below.
+    # REINSTATED 2026-07-06 per supervisor: PD must be the final heading
+    # controller, not the curvature fallback. Supervisor asked us to first
+    # verify the PP setpoint (alpha) against the actual wheel-encoder-diff
+    # heading response (w_odom, independent of AMCL/EKF), same units, before
+    # concluding anything about the earlier oscillation -- see the new
+    # 'heading_debug' topic / alpha_rad+w_odom columns added to
+    # collect_heading_response.py and the controller's own tuning CSV.
+    use_pd_heading: false
+
+    # Filtered-derivative PD heading controller (prof's design):
+    #   C_theta(s) = Kp + Kd * s/(Tf*s + 1)
+    # PP supplies the heading setpoint (angle to lookahead); the D term damps
+    # theta oscillation, and the first-order filter (Tf) rejects HF noise on it.
+    # Discrete: D_f[k] = a*D_f[k-1] + (1-a)*D_raw[k],  a = exp(-Ts/Tf).
+    heading_kp: 2.70              # rad/s per rad of heading error
+    heading_kd: 0.44              # rad/s per (rad/s) of heading error rate
+    heading_tf: 0.05              # s, derivative filter time constant
+
     # cross-track (Stanley-style) correction. Raise to hug the path harder,
     # lower if it oscillates.
-    crosstrack_gain: 1.0
+    crosstrack_gain: 0.5
 
     # velocity profiling. Higher -> slows more on curves.
     curve_slowdown: 1.5
@@ -33,3 +56,21 @@ custom_path_controller:
     global_frame: "map"
     robot_frame: "base_link"
     cmd_vel_topic: "cmd_vel_nav"
+
+    # RPP-style obstacle awareness (reads the global costmap; in custom mode
+    # there is no local_costmap because controller_server is not launched)
+    use_obstacle_costmap: true
+    costmap_topic: "/global_costmap/costmap"
+    cost_slow_gain: 0.7          # 0 = off, 1 = strong slowdown near obstacles
+    cost_slow_min_ratio: 0.25    # never slow below this fraction of speed
+    collision_cost: 99           # >= this along the arc => stop (99 inscribed, 100 lethal-only)
+    # REVERTED to 1.2s (2026-07-06, same day): raising this to 2.5s to catch
+    # a person stepping into the path also made the projected arc curve into
+    # rack inflation in narrow aisles (e.g. near X2_B), false-triggering the
+    # obstacle-stop and freezing the robot mid-goal during Test G. Confirmed
+    # via the controller_tuning log: v_cmd/w_cmd pinned at 0 for minutes while
+    # alpha_rad was nonzero (wanted to turn) -- the classic _arc_blocked
+    # signature. The real fix for slow obstacle detection is a dedicated
+    # local_costmap (faster refresh, robot-centered), not a longer horizon on
+    # the whole-map global_costmap -- deferred until after Test G/H.
+    collision_horizon: 1.2       # seconds to project the arc forward for collision

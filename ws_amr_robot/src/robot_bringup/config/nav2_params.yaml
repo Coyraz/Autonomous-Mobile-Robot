@@ -23,6 +23,15 @@ amcl:
     sigma_hit: 0.2
     tf_broadcast: True
     transform_tolerance: 1.0
+    # 2026-07-06: TRIED lowering to 0.05/0.05 to test whether infrequent AMCL
+    # corrections (pose jumps at each update) were driving the PD heading
+    # oscillation. REVERTED -- it did not fix the PD oscillation (rmse/corr
+    # unchanged) AND made the previously-stable curvature-only (use_pd_heading
+    # false) mode wavy too, that was NOT wavy before. Likely cause: in this
+    # warehouse's narrow, repetitive-looking aisles, forcing near-continuous
+    # AMCL corrections injects more particle-filter jitter into the pose than
+    # it removes -- infrequent corrections meant most of the time the pose
+    # was smooth short-term odometry extrapolation instead. Back to defaults.
     update_min_a: 0.2
     update_min_d: 0.25
     z_hit: 0.5
@@ -107,10 +116,45 @@ planner_server:
     use_sim_time: False
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.5
-      use_astar: true
+      plugin: "nav2_smac_planner::SmacPlannerLattice"
       allow_unknown: true
+      tolerance: 0.25                 # dist (m) to goal at which a plan is "good enough"
+      max_iterations: 1000000         # search iter limit before failing
+      max_on_approach_iterations: 1000
+      max_planning_time: 5.0          # seconds
+      analytic_expansion_ratio: 3.5
+      analytic_expansion_max_length: 3.0
+      reverse_penalty: 2.0
+      change_penalty: 0.05
+      non_straight_penalty: 1.05
+      cost_penalty: 2.0
+      rotation_penalty: 5.0
+      retrospective_penalty: 0.015
+      # Custom primitives, generated 2026-07-06 for this robot's actual turning
+      # radius (turning_radius = max_linear_speed/max_angular_speed = 0.20/0.60
+      # = 0.333m, rounded up to 0.35m for margin), replacing the generic
+      # 0.5m-turning-radius demo set shipped with nav2_smac_planner. Generated
+      # with the nav2_smac_planner/lattice_primitives tool (motion_model=diff,
+      # grid_resolution=0.05, num_of_headings=16, stopping_threshold=5).
+      lattice_filepath: "/home/kanal-raspi5/Autonomous-Mobile-Robot/ws_amr_robot/install/robot_bringup/share/robot_bringup/config/lattice_primitives/0.35m_turning_radius/diff/output.json"
+      lookup_table_size: 20.0
+      cache_obstacle_heuristic: false
+      allow_reverse_expansion: false  # warehouse AMR: do not plan reverse motions
+      smooth_path: true
+      smoother:
+        max_iterations: 2000
+        # Raised from 0.3 (2026-07-06): Foxglove showed the RAW /plan itself
+        # (not just the robot's tracked response) visibly wavy/kinked even
+        # with the custom 0.35m-turning-radius lattice -- the built-in
+        # smoother wasn't aggressive enough to straighten the chained
+        # primitive segments. This is a cheaper, more targeted fix than
+        # regenerating primitives again. Revert toward 0.3 if the smoothed
+        # path starts cutting into inflated/lethal cost cells near racks.
+        w_smooth: 0.6
+        w_data: 0.2
+        tolerance: 1.0e-10
+        do_refinement: true
+        refinement_num: 3
 
 local_costmap:
   local_costmap:
@@ -152,8 +196,22 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
+      # REAL ROOT CAUSE found 2026-07-06 (the update_frequency/publish_frequency
+      # tuning above was a red herring): Nav2's Costmap2DPublisher defaults to
+      # `always_send_full_costmap: false`, meaning the FULL grid on
+      # /global_costmap/costmap is only sent ONCE (or on costmap resize) --
+      # afterwards only /global_costmap/costmap_updates (incremental diffs)
+      # go out. custom_path_controller.py only subscribes to the full-grid
+      # topic (never costmap_updates), so its cached self._costmap has been a
+      # ONE-TIME STARTUP SNAPSHOT the whole time, not a live view -- any
+      # obstacle present at that exact moment gets "baked in" permanently
+      # (or, if none, the controller never sees new obstacles at all). This
+      # explains the mysterious mid-goal freezes far better than the
+      # frequency changes below ever did. Fix: force the full grid to
+      # actually keep republishing.
+      always_send_full_costmap: true
+      update_frequency: 2.0
+      publish_frequency: 2.0
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False

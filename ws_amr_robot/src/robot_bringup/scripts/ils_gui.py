@@ -23,10 +23,10 @@ from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from action_msgs.msg import GoalStatus
-from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, Twist
 from nav_msgs.msg import OccupancyGrid, Odometry
 from nav_msgs.msg import Path as NavPath
-from nav2_msgs.action import NavigateToPose
+from nav2_msgs.action import NavigateToPose, FollowWaypoints
 
 from flask import Flask, jsonify, request, Response
 
@@ -41,20 +41,53 @@ import matplotlib.patches as mpatches
 # C1 verified 2026-06-15 from /amcl_pose after robot parked at rack.
 # ============================================================
 RACK_GOALS = {
-    'Home':  ( 0.294,  0.018,  0.02),
-    'Stage': ( 3.760,  0.286,  1.54),
-    'A1':    ( 4.087, -8.052, -1.81),
-    'A2':    ( 4.261, -6.606, -1.37),
-    'A3':    ( 4.251, -4.724, -1.33),
-    'A4':    ( 4.135, -3.011, -1.36),
-    'B1':    ( 1.642, -8.256, -1.15),
-    'B2':    ( 1.749, -7.193, -1.69),
-    'B3':    ( 1.639, -4.818,  1.59),
-    'B4':    ( 1.748, -3.528,  1.46),
-    'C1':    (-0.830, -8.531, -1.33),
-    'C2':    (-0.972, -7.018, -1.51),
-    'C3':    (-1.002, -4.472, -1.53),
-    'C4':    (-0.944, -2.656, -1.37),
+    #'Home':  ( 0.294,  0.018,  0.02),
+    #'Stage': ( 3.760,  0.286,  1.54),
+    #'A1':    ( 4.087, -8.052, -1.81),
+    #'A2':    ( 4.261, -6.606, -1.37),
+    #'A3':    ( 4.251, -4.724, -1.33),
+    #'A4':    ( 4.135, -3.011, -1.36),
+    #'B1':    ( 1.642, -8.256, -1.15),
+    #'B2':    ( 1.749, -7.193, -1.69),
+    #'B3':    ( 1.639, -4.818,  1.59),
+    #'B4':    ( 1.748, -3.528,  1.46),
+    #'C1':    (-0.830, -8.531, -1.33),
+    #'C2':    (-0.972, -7.018, -1.51),
+    #'C3':    (-1.002, -4.472, -1.53),
+    #'C4':    (-0.944, -2.656, -1.37),
+    
+    # 2026-07-07, second pass: live /amcl_pose readings, operator parked the
+    # robot at each REAL tape mark and read pose+orientation directly (see
+    # amr_test_utils.py WAREHOUSE_WAYPOINTS for full provenance/rationale --
+    # same values, kept in sync). Verified no swaps this round (unlike the
+    # 2026-07-06 attempt, which mixed up A1/A2 and C1/C2). theta now comes
+    # from the measured AMCL yaw, not a 0.0 default -- much closer to a real
+    # parking heading than before. A2/Stage/Home kept from the prior
+    # (Round-1 / tape) pass per operator confirmation. C3 falls back to the
+    # Round-1 distance-transform value (raw AMCL reading was NO_VALID_PATH).
+    'Home':  (0.0,   0.0,  0.0),
+    'Stage': (3.5,   0.5,  0.0),
+    'A1':    (4.500, -8.420,  1.486),
+    'A2':    (4.422, -6.805,  0.0),   # kept from Round-1 (operator confirmed correct)
+    'A3':    (4.313, -4.373,  1.797),
+    'A4':    (4.335, -3.552,  1.652),
+    'B1':    (1.721, -8.569, -1.481),
+    'B2':    (1.955, -7.312,  1.683),
+    'B3':    (1.924, -4.563, -1.647),
+    'B4':    (1.961, -3.061,  1.747),
+    'C1':    (-0.891, -8.473,  1.416),
+    'C2':    (-0.790, -6.968, -1.580),
+    'C3':    (-0.678, -5.005,  0.0),  # fallback to Round-1 distance-transform (raw AMCL read was NO_VALID_PATH)
+    'C4':    (-0.706, -3.096,  1.627),
+  
+    'X1_A':      ( 4.0,  -5.7, 0.0),
+    'X1_B':      ( 1.5,  -5.7, 0.0),
+    'X1_C':      (-1.0,  -5.7, 0.0),
+    'X2_A':      ( 3.5,  -1.5, 0.0),
+    'X2_B':      ( 1.5,  -1.5, 0.0),
+    'X3_B':      ( 1.5,   0.0, 0.0),
+    'X3_C':      (-1.0,   0.0, 0.0),
+    'XA_T-junc': ( 4.0,  -1.5, 0.0),
 }
 
 SCRIPT_DIR = Path(__file__).parent
@@ -80,6 +113,7 @@ class NavBridgeNode(Node):
         # Internal action tracking
         self._goal_handle    = None
         self._pending_goal   = None
+        self._pending_wp     = None
         self._pending_cancel = False
 
         # Map
@@ -115,6 +149,9 @@ class NavBridgeNode(Node):
 
         # Action client for NavigateToPose
         self._nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+
+        # Action client for FollowWaypoints (multi-rack runs from the GUI)
+        self._wp_client = ActionClient(self, FollowWaypoints, 'follow_waypoints')
 
         # Timer processes Flask requests inside the ROS executor (non-blocking)
         self.create_timer(0.05, self._tick)
@@ -160,8 +197,10 @@ class NavBridgeNode(Node):
     def _tick(self):
         with self._lock:
             goal      = self._pending_goal
+            wp_goal   = self._pending_wp
             do_cancel = self._pending_cancel
             self._pending_goal   = None
+            self._pending_wp     = None
             self._pending_cancel = False
 
         if do_cancel:
@@ -182,16 +221,28 @@ class NavBridgeNode(Node):
                     self.nav_status     = 'error'
                     self.current_target = None
                 self.get_logger().error('NavigateToPose server not ready')
+        elif wp_goal:
+            if self._wp_client.server_is_ready():
+                self._do_send_wp(wp_goal)
+            else:
+                with self._lock:
+                    self.nav_status     = 'error'
+                    self.current_target = None
+                self.get_logger().error('FollowWaypoints server not ready')
+
+    def _make_pose(self, x, y, yaw):
+        p = PoseStamped()
+        p.header.frame_id    = 'map'
+        p.header.stamp       = self.get_clock().now().to_msg()
+        p.pose.position.x    = x
+        p.pose.position.y    = y
+        p.pose.orientation.z = math.sin(yaw / 2.0)
+        p.pose.orientation.w = math.cos(yaw / 2.0)
+        return p
 
     def _do_send_goal(self, rack_name):
-        x, y, yaw = RACK_GOALS[rack_name]
         goal_msg = NavigateToPose.Goal()
-        goal_msg.pose.header.frame_id    = 'map'
-        goal_msg.pose.header.stamp       = self.get_clock().now().to_msg()
-        goal_msg.pose.pose.position.x    = x
-        goal_msg.pose.pose.position.y    = y
-        goal_msg.pose.pose.orientation.z = math.sin(yaw / 2.0)
-        goal_msg.pose.pose.orientation.w = math.cos(yaw / 2.0)
+        goal_msg.pose = self._make_pose(*RACK_GOALS[rack_name])
         future = self._nav_client.send_goal_async(
             goal_msg, feedback_callback=lambda _: None)
         future.add_done_callback(lambda f: self._on_accepted(f, rack_name))
@@ -203,6 +254,24 @@ class NavBridgeNode(Node):
                 self.nav_status     = 'error'
                 self.current_target = None
             self.get_logger().warn(f'Goal to {rack_name} rejected by Nav2')
+            return
+        with self._lock:
+            self._goal_handle = handle
+        handle.get_result_async().add_done_callback(self._on_done)
+
+    def _do_send_wp(self, node_names):
+        goal_msg = FollowWaypoints.Goal()
+        goal_msg.poses = [self._make_pose(*RACK_GOALS[n]) for n in node_names]
+        future = self._wp_client.send_goal_async(goal_msg)
+        future.add_done_callback(lambda f: self._on_wp_accepted(f, node_names))
+
+    def _on_wp_accepted(self, future, node_names):
+        handle = future.result()
+        if not handle.accepted:
+            with self._lock:
+                self.nav_status     = 'error'
+                self.current_target = None
+            self.get_logger().warn(f'FollowWaypoints rejected: {node_names}')
             return
         with self._lock:
             self._goal_handle = handle
@@ -232,6 +301,16 @@ class NavBridgeNode(Node):
             self._pending_goal  = rack_name
             self.nav_status     = 'navigating'
             self.current_target = rack_name
+        return True, 'ok'
+
+    def request_follow_waypoints(self, node_names):
+        unknown = [n for n in node_names if n not in RACK_GOALS]
+        if unknown:
+            return False, f'node tak dikenal: {unknown}'
+        with self._lock:
+            self._pending_wp     = list(node_names)
+            self.nav_status      = 'navigating'
+            self.current_target  = ' -> '.join(node_names)
         return True, 'ok'
 
     def request_cancel(self):
@@ -303,11 +382,18 @@ class NavBridgeNode(Node):
                       extent=[ox, ox + w * res, oy, oy + h * res],
                       interpolation='nearest')
 
-            # Rack markers
+            # Rack + aisle markers. Aisles get their own color/shape (distinct
+            # from racks and Home/Stage) since some aisle cross-sections sit
+            # very close to real rack positions on the map (e.g. X1_A vs A3)
+            # and would otherwise be hard to tell apart.
             col_map = {'Home': '#388E3C', 'Stage': '#E65100'}
+            aisle_names = {'X1_A', 'X1_B', 'X1_C', 'X2_A', 'X2_B',
+                           'X3_B', 'X3_C', 'XA_T-junc'}
             for name, (rx, ry, _) in RACK_GOALS.items():
-                c = col_map.get(name, '#1565C0')
-                ax.plot(rx, ry, 's', color=c, ms=6,
+                is_aisle = name in aisle_names
+                c = col_map.get(name, '#8E24AA' if is_aisle else '#1565C0')
+                marker = '^' if is_aisle else 's'
+                ax.plot(rx, ry, marker, color=c, ms=6,
                         mec='white', mew=0.8, zorder=4)
                 ax.text(rx + 0.08, ry + 0.08, name, fontsize=5,
                         color='white', fontweight='bold', zorder=5,
@@ -866,6 +952,18 @@ def go_to_rack():
     if ok:
         x, y, theta = RACK_GOALS[rack]
         return jsonify({'status': 'navigating', 'rack': rack, 'goal': [x, y, theta]})
+    return jsonify({'status': 'error', 'message': msg}), 400
+
+
+@app.route('/follow_waypoints', methods=['POST'])
+def follow_waypoints():
+    data = request.get_json(silent=True) or {}
+    node_names = data.get('nodes', [])
+    if not node_names:
+        return jsonify({'status': 'error', 'message': 'nodes list kosong'}), 400
+    ok, msg = _node.request_follow_waypoints(node_names)
+    if ok:
+        return jsonify({'status': 'navigating', 'nodes': node_names})
     return jsonify({'status': 'error', 'message': msg}), 400
 
 
