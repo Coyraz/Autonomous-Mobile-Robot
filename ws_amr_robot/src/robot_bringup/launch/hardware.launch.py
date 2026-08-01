@@ -24,11 +24,13 @@ def generate_launch_description():
     # REVISI MUTLAK: Transformasi Fisik LiDAR
     # Urutan argumen: [X, Y, Z, Yaw, Pitch, Roll, Parent_Frame, Child_Frame]
     # X = 0.08 meter (8cm ke depan)
-    # Z = 0.17 meter (17cm ke atas dari lantai)
+    # Z = 0.29 meter (2026-07-21: spacer +12cm added for full 360deg clearance,
+    #     was 0.17m -- CONFIRM X/Y unchanged if the spacer also shifted the
+    #     mount horizontally, not just vertically)
     tf_node = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
-        arguments=['0.08', '0.0', '0.17', '3.14159', '0.0', '0.0', 'base_link', 'laser_frame'],
+        arguments=['0.08', '0.0', '0.29', '3.14159', '0.0', '0.0', 'base_link', 'laser_frame'],
         output='screen'
     )
 

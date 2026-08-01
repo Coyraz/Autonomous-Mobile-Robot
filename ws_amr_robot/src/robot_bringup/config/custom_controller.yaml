@@ -9,28 +9,16 @@ custom_path_controller:
     min_angular_speed: 0.55      # rad/s, motor rotation deadband
 
     # Pure Pursuit lookahead:  Ld = lookahead_gain * v + lookahead_min
-    # (reverted to original values 2026-07-06 -- raising lookahead to
-    # 0.45/0.70/0.5 during PD diagnosis made oscillation WORSE, not better,
-    # supporting the SmacLattice-path-quality theory over a lookahead-tuning fix)
     lookahead_min: 0.25
     lookahead_max: 0.40
     lookahead_gain: 0.3
 
     # use_pd_heading: false -> raw Pure Pursuit curvature (w = v*curvature), no PD.
     # true -> prof's filtered-PD heading law below.
-    # REINSTATED 2026-07-06 per supervisor: PD must be the final heading
-    # controller, not the curvature fallback. Supervisor asked us to first
-    # verify the PP setpoint (alpha) against the actual wheel-encoder-diff
-    # heading response (w_odom, independent of AMCL/EKF), same units, before
-    # concluding anything about the earlier oscillation -- see the new
-    # 'heading_debug' topic / alpha_rad+w_odom columns added to
-    # collect_heading_response.py and the controller's own tuning CSV.
     use_pd_heading: false
 
     # Filtered-derivative PD heading controller (prof's design):
     #   C_theta(s) = Kp + Kd * s/(Tf*s + 1)
-    # PP supplies the heading setpoint (angle to lookahead); the D term damps
-    # theta oscillation, and the first-order filter (Tf) rejects HF noise on it.
     # Discrete: D_f[k] = a*D_f[k-1] + (1-a)*D_raw[k],  a = exp(-Ts/Tf).
     heading_kp: 2.70              # rad/s per rad of heading error
     heading_kd: 0.44              # rad/s per (rad/s) of heading error rate
@@ -46,8 +34,9 @@ custom_path_controller:
 
     # goal acceptance
     goal_xy_tolerance: 0.12
-    goal_yaw_tolerance: 0.15
+    goal_yaw_tolerance: 0.087
     capture_radius: 0.18
+    final_align_dead_time: 0.6   # seconds, hold still after capture before rotating
 
     # if heading error to the path exceeds this, rotate in place first
     heading_align_thresh: 0.7    # rad
@@ -64,13 +53,27 @@ custom_path_controller:
     cost_slow_gain: 0.7          # 0 = off, 1 = strong slowdown near obstacles
     cost_slow_min_ratio: 0.25    # never slow below this fraction of speed
     collision_cost: 99           # >= this along the arc => stop (99 inscribed, 100 lethal-only)
-    # REVERTED to 1.2s (2026-07-06, same day): raising this to 2.5s to catch
-    # a person stepping into the path also made the projected arc curve into
-    # rack inflation in narrow aisles (e.g. near X2_B), false-triggering the
-    # obstacle-stop and freezing the robot mid-goal during Test G. Confirmed
-    # via the controller_tuning log: v_cmd/w_cmd pinned at 0 for minutes while
-    # alpha_rad was nonzero (wanted to turn) -- the classic _arc_blocked
-    # signature. The real fix for slow obstacle detection is a dedicated
-    # local_costmap (faster refresh, robot-centered), not a longer horizon on
-    # the whole-map global_costmap -- deferred until after Test G/H.
     collision_horizon: 1.2       # seconds to project the arc forward for collision
+    # 2026-07-13: guarantees a MINIMUM physical stop margin regardless of
+    # current speed. Pure v*collision_horizon shrinks as cost_slow_gain
+    # slows the robot near an obstacle -- measured live in Test H, stopped
+    # at only ~15cm (from the LiDAR mount, +0.08m ahead of base_link)
+    # despite a ~24-39cm time-horizon estimate at v_max.
+    #
+    # The stop triggers once distance-to-obstacle (from base_link) <=
+    # min_collision_margin + inscribed_radius (0.15m, from the footprint --
+    # this part is fixed, not tunable here). To land on a target measured
+    # from the LiDAR (offset +0.08m closer to the obstacle than base_link):
+    #   min_collision_margin = target_from_lidar + 0.08 - 0.15
+    # Target 50cm from LiDAR -> 0.50 + 0.08 - 0.15 = 0.43
+    # This is still a starting estimate, not exact -- re-measure with a tape
+    # after any change and adjust; see test10.md for the tuning log.
+    min_collision_margin: 0.43   # meters, from base_link -- floor on the arc look-ahead distance
+
+    # ---- Recovery: in-place spin sweep when held too long ----
+    # RE-ENABLE (set true) once Test H data collection is done.
+    enable_recovery: true        # set true to enable
+    recovery_stuck_timeout: 15.0  # seconds held before triggering a spin
+    recovery_spin_angle: 6.5      # rad, ~372 deg -- full sweep + a bit of overlap
+    recovery_spin_speed: 0.4      # rad/s, below max_angular_speed
+    recovery_max_attempts: 2      # per goal; goal aborts if still blocked after this many

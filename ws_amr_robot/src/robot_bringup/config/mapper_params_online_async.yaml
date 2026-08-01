@@ -38,12 +38,17 @@ slam_toolbox:
     scan_subscriber_queue_size: 10
     link_match_minimum_response_fine: 0.45
     link_scan_maximum_distance: 0.5
-    loop_search_maximum_distance: 1.5
+    # TRIAL 2026-07-21: loosened 1.5->1.8 to test if it reduces along-corridor
+    # drift (aisles are 2.5m apart, so 1.8m still leaves ~0.7m safety margin
+    # before risking a false loop-closure into the neighboring identical
+    # corridor). Response thresholds tightened to compensate (see test13.md).
+    # REVERT to 1.5 / 0.55 / 0.65 if this attempt fails or corrupts the map.
+    loop_search_maximum_distance: 1.8
     do_loop_closing: true
     loop_match_minimum_chain_size: 15
     loop_match_maximum_variance_coarse: 1.5
-    loop_match_minimum_response_coarse: 0.55
-    loop_match_minimum_response_fine: 0.65
+    loop_match_minimum_response_coarse: 0.65
+    loop_match_minimum_response_fine: 0.75
 
     # Performance
     throttle_scans: 2

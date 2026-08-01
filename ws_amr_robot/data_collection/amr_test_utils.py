@@ -58,24 +58,30 @@ DEFAULT_OUTPUT_DIR = os.path.expanduser('~/thesis_data/pengujian_6_pid')
 #     after searching 80cm around it. Fell back to the Round-1
 #     distance-transform value for this one point only.
 WAREHOUSE_WAYPOINTS = {
+    # 2026-07-24: RECALIBRATED against warehouse_v3_20260721_edited.yaml
+    # (new map -- LiDAR raised +12cm + loop-closure loosened, see test13.md).
+    # All 14 live AMCL reads, one point at a time with live neighbor cross-
+    # check (learned from the 2026-07-07 swap failure). Mean point error
+    # 14.3cm vs tape (down from 29.6cm on the original map, see test3.md).
+    # Old (pre-2026-07-24) values are superseded -- do not use.
     # --- Start / staging ---
-    'Home':       (0.0,   0.0),
-    'Stage':      (3.5,   0.5),
+    'Home':       (0.019,  -0.078),
+    'Stage':      (3.620,   0.461),
     # --- Rack A (X = 4.0) ---
-    'A1':         (4.500, -8.420),  # live AMCL read at REAL tape mark
-    'A2':         (4.422, -6.805),  # kept from Round-1 (operator confirmed correct)
-    'A3':         (4.313, -4.373),  # live AMCL read at REAL tape mark
-    'A4':         (4.335, -3.552),  # live AMCL read at REAL tape mark
+    'A1':         (3.904, -8.527),
+    'A2':         (3.973, -6.904),
+    'A3':         (4.104, -4.654),
+    'A4':         (4.103, -3.161),
     # --- Rack B (X = 1.5) ---
-    'B1':         (1.721, -8.569),  # live AMCL read at REAL tape mark
-    'B2':         (1.955, -7.312),  # live AMCL read at REAL tape mark
-    'B3':         (1.924, -4.563),  # live AMCL read at REAL tape mark
-    'B4':         (1.961, -3.061),  # live AMCL read at REAL tape mark
+    'B1':         (1.567, -8.486),
+    'B2':         (1.491, -7.124),
+    'B3':         (1.595, -4.715),
+    'B4':         (1.570, -2.911),
     # --- Rack C (X = -1.0) ---
-    'C1':        (-0.891, -8.473),  # live AMCL read at REAL tape mark
-    'C2':        (-0.790, -6.968),  # live AMCL read at REAL tape mark
-    'C3':        (-0.678, -5.005),  # NO_VALID_PATH at raw AMCL read -- fell back to Round-1 distance-transform value
-    'C4':        (-0.706, -3.096),  # live AMCL read at REAL tape mark
+    'C1':        (-1.072, -8.540),
+    'C2':        (-1.044, -7.066),
+    'C3':        (-0.970, -4.566),
+    'C4':        (-0.985, -2.912),  # re-measured 2026-07-24 after EKF restart (Vyaw reverted), error dropped 29.5cm->8.9cm
     # --- Cross-section row 1 (Y = -5.7) ---
     'X1_A':       (4.0,  -5.7),
     'X1_B':       (1.5,  -5.7),
@@ -92,6 +98,25 @@ WAREHOUSE_WAYPOINTS = {
 
 
 # ---------------------------------------------------------------- angles
+def load_map_image(map_yaml_path):
+    """Load a SLAM map (yaml + image) and return (image_array, extent) ready
+    for ax.imshow(img, extent=extent, origin='lower', cmap='gray') in
+    map-frame meters."""
+    import yaml
+    import numpy as np
+    from PIL import Image
+    with open(os.path.expanduser(map_yaml_path)) as f:
+        meta = yaml.safe_load(f)
+    map_dir = os.path.dirname(os.path.abspath(os.path.expanduser(map_yaml_path)))
+    img = Image.open(os.path.join(map_dir, meta['image']))
+    width, height = img.size
+    resolution = meta['resolution']
+    origin_x, origin_y = meta['origin'][0], meta['origin'][1]
+    extent = [origin_x, origin_x + width * resolution,
+              origin_y, origin_y + height * resolution]
+    return np.array(img), extent
+
+
 def wrap_to_180(angle_deg):
     """Normalize an angle in DEGREES to (-180, 180]."""
     a = (angle_deg + 180.0) % 360.0 - 180.0

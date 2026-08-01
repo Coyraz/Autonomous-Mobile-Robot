@@ -1,12 +1,31 @@
 ekf_filter_node:
   ros__parameters:
-    frequency: 30.0          
-    two_d_mode: true          
+    frequency: 30.0
+    two_d_mode: true
     publish_tf: true
     map_frame: map
     odom_frame: odom
     base_link_frame: base_link
     world_frame: odom
+
+    # 2026-07-24: enabled to actually instrument the covariance-collapse NaN
+    # crash instead of guessing at more parameter tweaks (5 guessed fixes
+    # have failed so far, see project memory). Publishes filter health/state
+    # to /diagnostics -- watch this live during long sessions to catch a
+    # rising covariance trend BEFORE it hits NaN, so the next incident can
+    # be root-caused with real data instead of only a post-mortem log.
+    print_diagnostics: true
+
+    # REMOVED 2026-07-24: this explicit process_noise_covariance (added
+    # 2026-07-14 as a guessed mitigation) was compared against a 1-month-old
+    # backup (~/Backups AMR/backup_25_6_2026/ws_amr_robot) that ran stable
+    # for a long period with Vyaw ALREADY false (IMU-only) and NO explicit
+    # process noise (robot_localization defaults only). Since Vyaw is also
+    # false right now yet crashes still happened, this was the most likely
+    # remaining suspect -- reverted to let robot_localization use its own
+    # defaults again, matching the known-stable baseline. If crashes stop,
+    # this (or the rejection-threshold revert below) was the actual culprit,
+    # not the Vyaw redundancy that got blamed originally.
 
     # ================================================================
     # SENSOR 1: RF2O LASER ODOMETRY
@@ -28,26 +47,80 @@ ekf_filter_node:
 
     # ================================================================
     # SENSOR 2: WHEEL ENCODER ODOMETRY
-    # Role: Real-time VELOCITY only (Vx and Vyaw)
+    # Role: Real-time VELOCITY (Vx AND Vyaw)
     # Encoders are fast and accurate for velocity on short timescales
     # We do NOT use position from encoder because RF2O does it better
     # ================================================================
+    # 2026-07-12: Vyaw from encoder ENABLED alongside IMU (was disabled -- "IMU
+    # handles this"). Real incident: IMU (MPU6050) lost its I2C connection mid-
+    # session (a known, recurring, currently only power-cycle-fixable hardware
+    # flakiness -- see freertos.c's own IMU re-init retry logic). With IMU as
+    # the ONLY Vyaw source, /imu/data_raw going silent left the EKF's yaw-rate
+    # state completely uncorrected -- it kept dead-reckoning forward with
+    # whatever Vyaw it last had (nonzero, if the robot was mid-turn when I2C
+    # stalled), so the filter believed the robot kept spinning forever even
+    # though it was physically stopped. This corrupted the costmap (obstacle_
+    # layer projects laser points using the false, still-rotating orientation)
+    # and desynced AMCL (whose motion model consumes the same bad odometry).
+    # Fix: run BOTH sensors for Vyaw at all times (true redundancy, not a
+    # detect-and-switch failover -- simpler and robot_localization already
+    # handles a source that stops publishing gracefully). IMU keeps priority
+    # via its covariance (0.005) being ~10x tighter than encoder's (0.05, see
+    # odometry_node.py) -- IMU dominates when healthy, encoder alone keeps
+    # correcting Vyaw (preventing runaway) if/when IMU drops out again.
+    #
+    # REVERTED 2026-07-14: this redundancy caused THREE separate live
+    # "Critical Error, NaNs detected" EKF crashes in one night (confirmed
+    # in ~/.ros/log/ekf_node_*.log), all while the robot was stationary --
+    # two different mitigation attempts (tightening odom1/imu0's
+    # twist_rejection_threshold 100->3, then adding an explicit
+    # process_noise_covariance with vx/vyaw bumped up) each failed to
+    # prevent a repeat. Reverting Vyaw to IMU-only (false below) to
+    # stabilize testing. Known trade-off this reintroduces: if the IMU's
+    # I2C connection drops again (see the 2026-07-12 incident described
+    # above), Vyaw goes uncorrected again until a manual power-cycle. This
+    # is considered less bad than a total EKF crash. If true redundancy is
+    # revisited later, it needs proper root-cause analysis of the
+    # covariance-collapse mechanism (not more guessed Q-matrix values) --
+    # see project memory for the full incident history.
     odom1: /odom_raw
+    # REVERTED AGAIN 2026-07-24: the isolation test's 252s-clean window
+    # (2026-07-14) never conclusively proved this stable -- a 4th live
+    # "Critical Error, NaNs detected" crash happened today, 65s after the
+    # robot went stationary (log ekf_node_47563_1784878926562.log, first
+    # NaN at 1784879250). IMU was confirmed HEALTHY at the time (checked
+    # /imu/data_raw immediately after -- normal angular_velocity, no
+    # dropout), ruling out the I2C-dropout theory for THIS occurrence and
+    # pointing at the covariance-collapse mechanism instead. Reverting to
+    # false (IMU-only Vyaw) per this file's own standing instruction above.
+    # Do not re-enable again without actual root-cause instrumentation of
+    # the covariance trace (see project memory) -- guessing-and-checking
+    # has now failed 4 times.
     odom1_config: [false, false, false,     # Position: NO (RF2O is better)
                    false, false, false,     # Orientation: NO
                    true,  false, false,     # Vx: YES - encoder velocity is fresh
-                   false, false, false,     # Vyaw from encoder: NO (IMU handles this)
+                   false, false, false,     # Vyaw: OFF again, see note above
                    false, false, false]     # Acceleration: NO
     odom1_differential: false
     odom1_relative: false
     odom1_queue_size: 5
     odom1_nodelay: true  
+    # REVERTED 2026-07-24: was tightened 100.0 -> 3.0 on 2026-07-13 after a
+    # hard-stop encoder glitch, but the 1-month-old backup ran stable at
+    # 100.0 for a long period (see process_noise_covariance revert note
+    # above for the full reasoning) -- reverting back to the known-stable
+    # value. This does reopen the original hard-stop glitch risk, but that
+    # was a single one-off incident vs. repeated stationary NaN crashes.
     odom1_twist_rejection_threshold: 100.0
 
     # ================================================================
     # SENSOR 3: IMU (MPU6050)
-    # Role: ANGULAR VELOCITY only (gyro_z = Vyaw)
-    # IMU reacts fastest to rotation - lower latency than any other sensor
+    # Role: ANGULAR VELOCITY (gyro_z = Vyaw) -- PRIMARY, not sole, source
+    # IMU reacts fastest to rotation - lower latency than any other sensor.
+    # Encoder Vyaw (odom1 above) runs concurrently as a redundant backup
+    # since 2026-07-12 (I2C dropout incident) -- IMU wins when both are
+    # healthy (tighter covariance), encoder alone still corrects Vyaw if
+    # IMU drops out.
     # We ignore acceleration because it is too noisy for a slow ground robot
     # ================================================================
     imu0: /imu/data_raw
@@ -61,4 +134,4 @@ ekf_filter_node:
     imu0_remove_gravitational_acceleration: true
     imu0_queue_size: 5
     imu0_nodelay: true   
-    imu0_twist_rejection_threshold: 100.0
+    imu0_twist_rejection_threshold: 100.0   # REVERTED 2026-07-24, see odom1_twist_rejection_threshold note above

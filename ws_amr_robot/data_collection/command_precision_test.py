@@ -39,10 +39,17 @@ the wheel-slip-accumulation signature.
 Targets: straight 1m/3m; rotation 90/180/270/360 deg (270 added 2026-07-10 to cover
 all four quadrant turns, not just 90/180/360).
 
+A 4th source, raw IMU gyro (/imu/data_raw, integrated angular_velocity.z), is compared
+for ROTATION targets only (2026-07-31) -- not for straight-line, since IMU carries no
+position/distance signal (the driver publishes orientation_covariance[0]=-1, i.e.
+orientation itself isn't even provided, and double-integrating linear_acceleration for
+1-3m targets would be dominated by drift, not a meaningful comparison).
+
 Output CSV: mode, test_type, target, target_unit, rep, ground_truth,
-            odom_fused, odom_raw, odom_rf2o, err_fused, err_raw, err_rf2o,
-            err_pct_fused, err_pct_raw, err_pct_rf2o, elapsed_s (auto mode only)
-Then a summary table comparing all three sources per target.
+            odom_fused, odom_raw, odom_rf2o, odom_imu, err_fused, err_raw, err_rf2o, err_imu,
+            err_pct_fused, err_pct_raw, err_pct_rf2o, err_pct_imu, elapsed_s (auto mode only)
+            (odom_imu/err_imu/err_pct_imu are blank for test_type=straight)
+Then a summary table comparing all sources per target.
 
 Usage:
   python3 command_precision_test.py --mode manual --reps 5 --label warehouse
@@ -62,6 +69,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Imu
 
 import amr_test_utils as U
 
@@ -154,18 +162,70 @@ class OdomCumulative:
             return dist, self.cum_yaw_deg
 
 
+class ImuYawCumulative:
+    """Tracks cumulative yaw (deg) by integrating /imu/data_raw's raw
+    angular_velocity.z (trapezoidal rule, dt from consecutive header.stamp).
+
+    IMU is added as a 4th source for ROTATION targets ONLY, not straight-line
+    distance: sensor_msgs/Imu carries orientation/angular-rate, not position,
+    and this driver publishes orientation_covariance[0] = -1 (stm32_bridge.py)
+    meaning orientation itself is NOT provided -- there is no IMU-native
+    "distance traveled" to compare against 1m/3m targets short of double-
+    integrating linear_acceleration, which drifts too badly to be meaningful
+    over that short a distance. A signed incremental integral of angular
+    velocity has no such problem (same reasoning as OdomCumulative's yaw
+    tracking -- zero-mean gyro noise cancels in a signed sum, unlike a norm)."""
+
+    def __init__(self, node, topic):
+        self._lock = threading.Lock()
+        self.cum_yaw_deg = 0.0
+        self._prev_t = None
+        self._prev_wz = None
+        self._has_data = False
+        node.create_subscription(Imu, topic, self._cb, qos_profile_sensor_data)
+
+    def _cb(self, msg: Imu):
+        t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        wz = msg.angular_velocity.z
+        with self._lock:
+            self._has_data = True
+            if self._prev_t is not None:
+                dt = t - self._prev_t
+                if 0.0 < dt < 1.0:  # guard against a bad/duplicate/stale stamp
+                    avg_wz = (wz + self._prev_wz) / 2.0
+                    self.cum_yaw_deg += math.degrees(avg_wz * dt)
+            self._prev_t = t
+            self._prev_wz = wz
+
+    @property
+    def has_data(self):
+        with self._lock:
+            return self._has_data
+
+    def zero(self):
+        with self._lock:
+            self.cum_yaw_deg = 0.0
+            self._prev_t = None
+            self._prev_wz = None
+
+    def read(self):
+        with self._lock:
+            return self.cum_yaw_deg
+
+
 class CommandPrecisionNode(Node):
-    def __init__(self, fused_topic, raw_topic, rf2o_topic, need_cmd_pub):
+    def __init__(self, fused_topic, raw_topic, rf2o_topic, imu_topic, need_cmd_pub):
         super().__init__('command_precision_test')
         self.fused = OdomCumulative(self, fused_topic)
         self.raw = OdomCumulative(self, raw_topic)
         self.rf2o = OdomCumulative(self, rf2o_topic)
+        self.imu = ImuYawCumulative(self, imu_topic)
         self.cmd_pub = self.create_publisher(Twist, CMD_VEL_TOPIC, 10) if need_cmd_pub else None
 
     def wait_for_data(self, timeout_s=10.0):
         t0 = time.time()
         while rclpy.ok() and time.time() - t0 < timeout_s:
-            if self.fused.has_data and self.raw.has_data and self.rf2o.has_data:
+            if self.fused.has_data and self.raw.has_data and self.rf2o.has_data and self.imu.has_data:
                 return True
             time.sleep(0.1)
         return False
@@ -174,6 +234,7 @@ class CommandPrecisionNode(Node):
         self.fused.zero()
         self.raw.zero()
         self.rf2o.zero()
+        self.imu.zero()
 
     def stop(self):
         if self.cmd_pub is not None:
@@ -246,6 +307,7 @@ def main():
     ap.add_argument('--fused-topic', default='/odom')
     ap.add_argument('--raw-topic', default='/odom_raw')
     ap.add_argument('--rf2o-topic', default='/odom_rf2o')
+    ap.add_argument('--imu-topic', default='/imu/data_raw')
     ap.add_argument('--label', default=None)
     ap.add_argument('--out-dir', default=None)
     ap.add_argument('--straight-only', action='store_true', help="skip rotation tests")
@@ -256,19 +318,21 @@ def main():
 
     rclpy.init()
     node = CommandPrecisionNode(args.fused_topic, args.raw_topic, args.rf2o_topic,
-                                need_cmd_pub=auto)
+                                args.imu_topic, need_cmd_pub=auto)
     stop_event = threading.Event()
     spinner = threading.Thread(target=spin_thread, args=(node, stop_event), daemon=True)
     spinner.start()
 
-    print("Waiting for /odom (fused), /odom_raw, /odom_rf2o ...")
+    print("Waiting for /odom (fused), /odom_raw, /odom_rf2o, /imu/data_raw ...")
     if not node.wait_for_data(timeout_s=10.0):
-        print("ERROR: did not receive data on all three odometry topics within 10s.")
+        print("ERROR: did not receive data on all four topics within 10s.")
         print("Check hardware.launch.py + ekf_filter_node + rf2o_laser_odometry are running.")
         print("If /odom_rf2o is the one missing: check the LiDAR's USB connection "
               "(lsusb / /dev/serial/by-id/) -- sllidar_node dies silently if unplugged.")
+        print("If /imu/data_raw is the one missing: check stm32_bridge is running and "
+              "the STM32 is publishing IMU frames.")
         stop_event.set(); node.destroy_node(); rclpy.shutdown(); sys.exit(1)
-    print("Receiving all three odometry sources. Good.\n")
+    print("Receiving all four sources. Good.\n")
 
     mode_desc = ("AUTO -- script commands the robot, autonomous stop, operator "
                  "tape-measures the result" if auto else
@@ -350,20 +414,25 @@ def main():
                 fused_d, fused_y = node.fused.read()
                 raw_d, raw_y = node.raw.read()
                 rf2o_d, rf2o_y = node.rf2o.read()
+                imu_y = node.imu.read()
                 if not auto:
-                    fused_y, raw_y, rf2o_y = abs(fused_y), abs(raw_y), abs(rf2o_y)
+                    fused_y, raw_y, rf2o_y, imu_y = abs(fused_y), abs(raw_y), abs(rf2o_y), abs(imu_y)
                 e_f, e_r, e_o = fused_y - ground_truth, raw_y - ground_truth, rf2o_y - ground_truth
+                e_i = imu_y - ground_truth
                 print(f"    ground_truth={ground_truth:.2f}deg  fused={fused_y:.2f}deg({e_f:+.2f})  "
-                      f"raw={raw_y:.2f}deg({e_r:+.2f})  rf2o={rf2o_y:.2f}deg({e_o:+.2f})")
+                      f"raw={raw_y:.2f}deg({e_r:+.2f})  rf2o={rf2o_y:.2f}deg({e_o:+.2f})  "
+                      f"imu={imu_y:.2f}deg({e_i:+.2f})")
                 rows.append({
                     'mode': args.mode, 'test_type': 'rotation', 'target': target_deg,
                     'target_unit': 'deg', 'rep': rep, 'ground_truth': round(ground_truth, 3),
                     'odom_fused': round(fused_y, 3), 'odom_raw': round(raw_y, 3),
-                    'odom_rf2o': round(rf2o_y, 3),
+                    'odom_rf2o': round(rf2o_y, 3), 'odom_imu': round(imu_y, 3),
                     'err_fused': round(e_f, 3), 'err_raw': round(e_r, 3), 'err_rf2o': round(e_o, 3),
+                    'err_imu': round(e_i, 3),
                     'err_pct_fused': round(err_pct(e_f, ground_truth), 2),
                     'err_pct_raw': round(err_pct(e_r, ground_truth), 2),
                     'err_pct_rf2o': round(err_pct(e_o, ground_truth), 2),
+                    'err_pct_imu': round(err_pct(e_i, ground_truth), 2),
                     'elapsed_s': round(elapsed, 2) if elapsed is not None else '',
                 })
 
@@ -378,15 +447,18 @@ def main():
     path = U.timestamped_path('command_precision', out_dir=args.out_dir,
                               label=args.label or args.mode)
     U.save_csv(path, ['mode', 'test_type', 'target', 'target_unit', 'rep', 'ground_truth',
-                      'odom_fused', 'odom_raw', 'odom_rf2o',
-                      'err_fused', 'err_raw', 'err_rf2o',
-                      'err_pct_fused', 'err_pct_raw', 'err_pct_rf2o', 'elapsed_s'], rows)
+                      'odom_fused', 'odom_raw', 'odom_rf2o', 'odom_imu',
+                      'err_fused', 'err_raw', 'err_rf2o', 'err_imu',
+                      'err_pct_fused', 'err_pct_raw', 'err_pct_rf2o', 'err_pct_imu',
+                      'elapsed_s'], rows)
 
-    print("\n" + "=" * 78)
+    print("\n" + "=" * 88)
     print(f" SUMMARY  (mode={args.mode}, mean error % vs ground truth, by source)")
-    print("=" * 78)
-    print(f" {'type':>8} {'target':>8} | {'fused%':>8} | {'raw%':>8} | {'rf2o%':>8} | {'n':>3}")
-    print(" " + "-" * 74)
+    print(" (imu% is rotation-only -- IMU has no distance/position signal to compare "
+          "for straight-line targets)")
+    print("=" * 88)
+    print(f" {'type':>8} {'target':>8} | {'fused%':>8} | {'raw%':>8} | {'rf2o%':>8} | {'imu%':>8} | {'n':>3}")
+    print(" " + "-" * 84)
     for ttype in ['straight', 'rotation']:
         targets = STRAIGHT_TARGETS_M if ttype == 'straight' else ROTATION_TARGETS_DEG
         unit = 'm' if ttype == 'straight' else 'deg'
@@ -397,7 +469,11 @@ def main():
             mf = sum(r['err_pct_fused'] for r in subset) / len(subset)
             mr = sum(r['err_pct_raw'] for r in subset) / len(subset)
             mo = sum(r['err_pct_rf2o'] for r in subset) / len(subset)
-            print(f" {ttype:>8} {t:>6g}{unit:>2} | {mf:+8.2f} | {mr:+8.2f} | {mo:+8.2f} | {len(subset):3d}")
+            if ttype == 'rotation':
+                mi_str = f"{sum(r['err_pct_imu'] for r in subset) / len(subset):+8.2f}"
+            else:
+                mi_str = f"{'--':>8}"
+            print(f" {ttype:>8} {t:>6g}{unit:>2} | {mf:+8.2f} | {mr:+8.2f} | {mo:+8.2f} | {mi_str} | {len(subset):3d}")
 
     print(f"\nSaved: {path}")
     print("\nNote: 'raw' (encoder-only) vs 'fused'/'rf2o' error trend across targets is the "

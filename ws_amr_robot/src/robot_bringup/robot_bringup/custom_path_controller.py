@@ -56,6 +56,7 @@ from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Path, OccupancyGrid, Odometry
 from std_msgs.msg import Float64MultiArray
 from nav2_msgs.action import NavigateToPose, ComputePathToPose
+from nav2_msgs.srv import ClearEntireCostmap
 
 import tf2_ros
 
@@ -102,6 +103,7 @@ class CustomPathController(Node):
         self.declare_parameter('goal_xy_tolerance', 0.12)
         self.declare_parameter('goal_yaw_tolerance', 0.15)
         self.declare_parameter('capture_radius', 0.18)      # latch final turn within this
+        self.declare_parameter('final_align_dead_time', 0.6)  # s: hold still after capture, let AMCL/EKF yaw settle before rotating (2026-07-24, see custom_controller.yaml)
         self.declare_parameter('approach_dist', 0.35)       # start slowing here
         self.declare_parameter('heading_align_thresh', 0.7) # rad: rotate in place first
         self.declare_parameter('global_frame', 'map')
@@ -119,6 +121,38 @@ class CustomPathController(Node):
         self.declare_parameter('cost_slow_min_ratio', 0.25)  # never slow below this fraction of v
         self.declare_parameter('collision_cost', 99)         # >= this along the arc => stop (99 = inscribed)
         self.declare_parameter('collision_horizon', 1.2)     # seconds to project the arc forward
+        # 2026-07-13: min_collision_margin added. A pure time horizon
+        # (v * collision_horizon) shrinks as cost_slow_gain slows the robot
+        # down near an obstacle -- the slower it creeps, the LESS distance
+        # gets projected, so the physical stop margin actually SHRINKS the
+        # more aggressively speed is cut, not the other way around (measured
+        # live: Test H stopped at only ~15cm despite a ~24-39cm time-horizon
+        # estimate at v_max, root-caused to this). This parameter guarantees
+        # a minimum physical look-ahead distance regardless of current
+        # speed -- see the max() in _arc_blocked below.
+        self.declare_parameter('min_collision_margin', 0.35)  # meters, from base_link
+
+        # ---- Recovery: in-place spin sweep when held too long ----
+        # 2026-07-13: added after being asked whether the controller has any
+        # automated recovery (spin/backup) when something looks wrong -- it
+        # didn't. The known recurring failure mode this targets: the LiDAR's
+        # rear field of view is physically blocked by the battery on this
+        # small chassis, so a stale/phantom obstacle_layer mark behind or to
+        # the side of the robot can never self-clear via raytracing (it only
+        # clears when a FRESH scan passes through that cell again) --
+        # previously the only fix was the operator manually spinning the
+        # robot 360 deg. This automates that same trick: if _arc_blocked
+        # holds the robot for longer than recovery_stuck_timeout, spin in
+        # place (forces the LiDAR to sweep past the blind spot and re-
+        # raytrace stale cells), then clear_entirely_global_costmap, then
+        # resume the SAME goal. Bounded by recovery_max_attempts per goal so
+        # a genuinely persistent real obstacle (Test H's intended scenario)
+        # still eventually aborts instead of spinning forever.
+        self.declare_parameter('enable_recovery', True)
+        self.declare_parameter('recovery_stuck_timeout', 15.0)  # s held before spinning
+        self.declare_parameter('recovery_spin_angle', 6.5)      # rad, ~372 deg (full sweep + overlap)
+        self.declare_parameter('recovery_spin_speed', 0.4)      # rad/s, below w_max
+        self.declare_parameter('recovery_max_attempts', 2)      # per goal, then abort
 
         gp = self.get_parameter
         self.hz          = gp('control_frequency').value
@@ -144,6 +178,7 @@ class CustomPathController(Node):
         self.tol_xy      = gp('goal_xy_tolerance').value
         self.tol_yaw     = gp('goal_yaw_tolerance').value
         self.capture_r   = gp('capture_radius').value
+        self.final_align_dead_time = gp('final_align_dead_time').value
         self.approach    = gp('approach_dist').value
         self.align_th    = gp('heading_align_thresh').value
         self.global_frame = gp('global_frame').value
@@ -156,7 +191,16 @@ class CustomPathController(Node):
         self.cost_slow_min = gp('cost_slow_min_ratio').value
         self.collision_cost = gp('collision_cost').value
         self.collision_hz  = gp('collision_horizon').value
+        self.min_collision_margin = gp('min_collision_margin').value
         self._costmap = None   # latest OccupancyGrid snapshot
+
+        self.enable_recovery   = gp('enable_recovery').value
+        self.recovery_timeout  = gp('recovery_stuck_timeout').value
+        self.recovery_angle    = gp('recovery_spin_angle').value
+        self.recovery_speed    = gp('recovery_spin_speed').value
+        self.recovery_max_att  = gp('recovery_max_attempts').value
+        self._held_since = None       # time.time() when the current hold started, or None
+        self._recovery_attempts = 0   # reset per goal in run_path()
 
         # measured angular velocity from wheel-encoder speed DIFFERENTIAL
         # (odometry_node.py: vyaw = d_theta/dt from raw ticks, NOT AMCL/EKF-
@@ -196,6 +240,11 @@ class CustomPathController(Node):
         # client to the existing NavFn global planner
         self.plan_client = ActionClient(
             self, ComputePathToPose, 'compute_path_to_pose', callback_group=cb)
+
+        # client for the recovery spin's costmap clear (see enable_recovery above)
+        self._clear_costmap_cli = self.create_client(
+            ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap',
+            callback_group=cb)
 
         # same action name bt_navigator used, so ils_gui is unchanged
         self.nav_server = ActionServer(
@@ -274,13 +323,27 @@ class CustomPathController(Node):
         return cm.data[my * info.width + mx]
 
     def _arc_blocked(self, rx, ry, ryaw, v, w):
-        """Project the (v, w) arc forward collision_horizon seconds; True if it
-        crosses a cell at or above collision_cost (a real obstacle)."""
+        """Project the (v, w) arc forward far enough to cover at least
+        min_collision_margin meters (regardless of current speed) and at
+        least collision_horizon seconds; True if it crosses a cell at or
+        above collision_cost (a real obstacle).
+
+        Using a PURE time horizon (v * collision_horizon) has a perverse
+        property: cost_slow_gain slows the robot down near obstacles, so a
+        slower v projects LESS distance -- the more the robot decelerates
+        approaching something, the closer it gets before the stop actually
+        triggers. min_collision_margin/v extends the time window as v drops
+        so the physical look-ahead distance stays >= min_collision_margin
+        even when creeping. At v_max this term is usually smaller than
+        collision_horizon and has no effect; it only kicks in once the
+        robot has slowed down.
+        """
         if v <= 0.0 or self._costmap is None:
             return False
         dt = 0.1
+        horizon = max(self.collision_hz, self.min_collision_margin / v)
         x, y, th = rx, ry, ryaw
-        for _ in range(int(self.collision_hz / dt)):
+        for _ in range(int(horizon / dt)):
             x += v * math.cos(th) * dt
             y += v * math.sin(th) * dt
             th += w * dt
@@ -373,6 +436,7 @@ class CustomPathController(Node):
         cmd = Twist()
         self._dbg_ct = 0.0   # cross-track error, for the tuning log
         self._dbg_he = 0.0   # heading error, for the tuning log
+        self._last_held = False   # set True below only on the obstacle-hold path
 
         dist_to_goal = math.hypot(goal_xy[0] - rx, goal_xy[1] - ry)
 
@@ -382,10 +446,18 @@ class CustomPathController(Node):
         # 360 spin: without it, a slight overshoot puts the goal behind the
         # robot, the heading-align below spins around to chase it, the robot
         # drives past again, and it loops forever.
-        if dist_to_goal <= self.capture_r:
+        if dist_to_goal <= self.capture_r and not self._final_align:
             self._final_align = True
+            self._final_align_since = time.time()
 
         if self._final_align:
+            # ---- dead time: hold still, let AMCL/EKF yaw settle before acting ----
+            # Right after arrival the yaw estimate can still be jumpy (particle
+            # filter re-converging in a symmetric-looking spot); rotating on a
+            # noisy reading immediately causes visible back-and-forth "jumping"
+            # instead of a clean settle. Added 2026-07-24.
+            if time.time() - self._final_align_since < self.final_align_dead_time:
+                return cmd, False  # zero twist, just wait
             yaw_err = normalize_angle(goal_yaw - ryaw)
             if abs(yaw_err) <= self.tol_yaw:
                 return cmd, True  # done, zero twist, latched stop
@@ -497,6 +569,7 @@ class CustomPathController(Node):
                                    throttle_duration_sec=1.0)
             self._dbg_ct = e_ct
             self._dbg_he = head_err
+            self._last_held = True
             return Twist(), False
 
         # stash for the tuning log
@@ -522,8 +595,11 @@ class CustomPathController(Node):
         goal_yaw = yaw_from_quat(goal_pose.pose.orientation)
         self._last_idx = 0
         self._final_align = False
+        self._final_align_since = None
         self._prev_alpha = 0.0   # reset D term history for each new goal
         self._df         = 0.0   # reset filtered-derivative state
+        self._held_since = None       # reset stuck-timer for each new goal
+        self._recovery_attempts = 0   # reset recovery-attempt count for each new goal
 
         logger = self._open_log()
         t0 = time.time()
@@ -556,6 +632,30 @@ class CustomPathController(Node):
                     continue
                 cmd, done = self.compute_cmd(pose, pts, goal_xy, goal_yaw)
                 self.cmd_pub.publish(cmd)
+
+                if self.enable_recovery:
+                    if self._last_held:
+                        if self._held_since is None:
+                            self._held_since = time.time()
+                        elif time.time() - self._held_since > self.recovery_timeout:
+                            if self._recovery_attempts < self.recovery_max_att:
+                                self._recovery_attempts += 1
+                                if not self._do_recovery(action_handle, my_gen):
+                                    # cancelled/preempted mid-spin -- bail out
+                                    # the same way the main loop would have
+                                    self.stop()
+                                    return False
+                                self._held_since = None  # fresh window after recovery
+                            else:
+                                self.get_logger().error(
+                                    'Still blocked after %d recovery attempt(s) -- '
+                                    'aborting goal (likely a real, persistent obstacle).'
+                                    % self._recovery_attempts)
+                                self.stop()
+                                return False
+                    else:
+                        self._held_since = None
+
                 if logger is not None:
                     logger.writerow([
                         f'{time.time() - t0:.3f}',
@@ -572,6 +672,65 @@ class CustomPathController(Node):
             self._close_log()
         self.stop()
         return False
+
+    def _do_recovery(self, action_handle=None, my_gen=None):
+        """Spin in place to sweep the LiDAR past its rear blind spot (blocked
+        by the battery on this chassis) and re-raytrace any stale/phantom
+        obstacle_layer cell that can't self-clear from the current heading,
+        then clear the costmap outright and let run_path()'s loop resume the
+        same goal on the next tick. Blocking (like run_path itself already
+        is in its own ReentrantCallbackGroup thread) -- MultiThreadedExecutor
+        keeps servicing other callbacks (costmap updates, TF, etc.) while
+        this runs. Returns False if cancelled/preempted mid-spin (caller
+        should treat that exactly like a normal loop exit), True otherwise.
+        """
+        self.get_logger().warn(
+            'Blocked for over %.0fs -- running recovery spin (attempt %d/%d).'
+            % (self.recovery_timeout, self._recovery_attempts, self.recovery_max_att))
+        self.stop()
+        time.sleep(0.2)
+
+        twist = Twist()
+        twist.angular.z = math.copysign(self.recovery_speed, self.recovery_angle or 1.0)
+        spin_duration = abs(self.recovery_angle) / self.recovery_speed
+        period = 1.0 / self.hz
+        t_end = time.time() + spin_duration
+        while rclpy.ok() and time.time() < t_end:
+            if my_gen is not None and my_gen != self._goal_generation:
+                self.stop()
+                return False
+            if action_handle is not None and action_handle.is_cancel_requested:
+                self.stop()
+                return False
+            self.cmd_pub.publish(twist)
+            time.sleep(period)
+        self.stop()
+        time.sleep(0.3)
+
+        self._clear_costmap_blocking()
+        self.get_logger().info('Recovery spin complete, costmap cleared, resuming goal.')
+        return True
+
+    def _clear_costmap_blocking(self, timeout_s=3.0):
+        """Same clear_entirely_global_costmap call as ils_gui.py/
+        rosbag_ground_truth.py, but polling future.done() instead of
+        rclpy.spin_until_future_complete() -- this node's executor is
+        already spinning (MultiThreadedExecutor across several callback
+        groups), and spin_until_future_complete() would try to enter a
+        second, conflicting spin on top of that ("Executor is already
+        spinning"), the exact bug hit and fixed in rosbag_ground_truth.py.
+        """
+        if not self._clear_costmap_cli.wait_for_service(timeout_sec=timeout_s):
+            self.get_logger().warn('clear_entirely_global_costmap not available, skipping.')
+            return False
+        future = self._clear_costmap_cli.call_async(ClearEntireCostmap.Request())
+        deadline = time.time() + timeout_s
+        while rclpy.ok() and not future.done():
+            if time.time() > deadline:
+                self.get_logger().warn('clear_entirely_global_costmap timed out.')
+                return False
+            time.sleep(0.02)
+        return future.done()
 
     def _open_log(self):
         """Open a per-run CSV of tracking error for offline gain analysis."""

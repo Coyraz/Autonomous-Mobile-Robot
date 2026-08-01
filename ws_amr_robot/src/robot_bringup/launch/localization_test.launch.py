@@ -40,7 +40,9 @@ def launch_setup(context, *args, **kwargs):
 
     lidar_port = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0'
     nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
-    map_file = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_edited.yaml')
+    # 2026-07-25: was warehouse_v1_edited.yaml -- stale, out of sync with
+    # navigation.launch.py since the 2026-07-24 remap. Synced to match.
+    map_file = os.path.join(pkg_bringup, 'maps', 'warehouse_v3_20260721_edited.yaml')
     ekf_config = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
     twist_mux_config = os.path.join(pkg_bringup, 'config', 'twist_mux.yaml')
 
@@ -62,7 +64,9 @@ def launch_setup(context, *args, **kwargs):
 
     nodes.append(Node(
         package='tf2_ros', executable='static_transform_publisher',
-        arguments=['0.08', '0.0', '0.17', '3.14159', '0.0', '0.0',
+        # 2026-07-25: was 0.17 -- stale, out of sync with hardware.launch.py
+        # since the 2026-07-21 LiDAR +12cm spacer change. Synced to match.
+        arguments=['0.08', '0.0', '0.29', '3.14159', '0.0', '0.0',
                    'base_link', 'laser_frame'],
         output='screen'))
 

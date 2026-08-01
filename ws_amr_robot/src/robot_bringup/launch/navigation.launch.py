@@ -16,8 +16,8 @@ def generate_launch_description():
     bt_navigator_dir = get_package_share_directory('nav2_bt_navigator')
 
     # 2. File locations
-    map_file        = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_edited_edited.yaml')
-    keepout_file    = os.path.join(pkg_bringup, 'maps', 'warehouse_v1_keepout.yaml')
+    map_file        = os.path.join(pkg_bringup, 'maps', 'warehouse_v3_20260721_edited.yaml')  # GATE CHECK 2 2026-07-21: new LiDAR height (+12cm) + loosened loop-closure -- revert to warehouse_v1_edited_edited.yaml if this also fails, see test13.md
+    keepout_file    = os.path.join(pkg_bringup, 'maps', 'warehouse_v3_20260721_keepout.yaml')
     nav2_params_file = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     custom_ctrl_file = os.path.join(pkg_bringup, 'config', 'custom_controller.yaml')
     rpp_ctrl_file   = os.path.join(pkg_bringup, 'config', 'controller_rpp.yaml')

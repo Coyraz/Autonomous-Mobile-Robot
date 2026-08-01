@@ -26,8 +26,7 @@ from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, Twist
 from nav_msgs.msg import OccupancyGrid, Odometry
 from nav_msgs.msg import Path as NavPath
-from nav2_msgs.action import NavigateToPose, FollowWaypoints
-from nav2_msgs.srv import ClearEntireCostmap
+from nav2_msgs.action import NavigateToPose, FollowWaypoints, FollowPath
 
 from flask import Flask, jsonify, request, Response
 
@@ -57,36 +56,29 @@ RACK_GOALS = {
     #'C3':    (-1.002, -4.472, -1.53),
     #'C4':    (-0.944, -2.656, -1.37),
     
-    # 2026-07-24: RECALIBRATED against warehouse_v3_20260721_edited.yaml
-    # (new map -- LiDAR raised +12cm + loop-closure loosened, see test13.md).
-    # All 14 live AMCL reads (x, y), one point at a time with live neighbor
-    # cross-check (learned from the 2026-07-07 swap failure -- one bad read
-    # this round, mislabeled "C4", was caught live and redone before being
-    # written here). Mean point error 12.6cm vs tape (down from 29.6cm on
-    # the original map, see test3.md). Kept in sync with amr_test_utils.py
-    # WAREHOUSE_WAYPOINTS. Old (pre-2026-07-24, 2026-07-07 second-pass)
-    # values are superseded -- do not use.
-    #
-    # theta forced to pi/2 (90deg, 1.571 rad) for EVERY point, 2026-07-24:
-    # the individually-measured yaw values were just whatever direction the
-    # operator happened to be facing when each reading was taken (not a
-    # deliberate parking heading), so they varied inconsistently (~120-140deg
-    # range) point to point. Standardized to a single consistent heading
-    # instead of using that noise.
-    'Home':  (0.019,  -0.078,  1.571),
-    'Stage': (3.620,   0.461,  1.571),
-    'A1':    (3.904,  -8.527,  1.571),
-    'A2':    (3.973,  -6.904,  1.571),
-    'A3':    (4.104,  -4.654,  1.571),
-    'A4':    (4.103,  -3.161,  1.571),
-    'B1':    (1.567,  -8.486,  1.571),
-    'B2':    (1.491,  -7.124,  1.571),
-    'B3':    (1.595,  -4.715,  1.571),
-    'B4':    (1.570,  -2.911,  1.571),
-    'C1':    (-1.072, -8.540,  1.571),
-    'C2':    (-1.044, -7.066,  1.571),
-    'C3':    (-0.970, -4.566,  1.571),
-    'C4':    (-0.985, -2.912,  1.571),  # xy re-measured 2026-07-24 after EKF restart (Vyaw reverted), error dropped 29.5cm->8.9cm
+    # 2026-07-07, second pass: live /amcl_pose readings, operator parked the
+    # robot at each REAL tape mark and read pose+orientation directly (see
+    # amr_test_utils.py WAREHOUSE_WAYPOINTS for full provenance/rationale --
+    # same values, kept in sync). Verified no swaps this round (unlike the
+    # 2026-07-06 attempt, which mixed up A1/A2 and C1/C2). theta now comes
+    # from the measured AMCL yaw, not a 0.0 default -- much closer to a real
+    # parking heading than before. A2/Stage/Home kept from the prior
+    # (Round-1 / tape) pass per operator confirmation. C3 falls back to the
+    # Round-1 distance-transform value (raw AMCL reading was NO_VALID_PATH).
+    'Home':  (0.0,   0.0,  0.0),
+    'Stage': (3.5,   0.5,  0.0),
+    'A1':    (4.500, -8.420,  1.486),
+    'A2':    (4.422, -6.805,  0.0),   # kept from Round-1 (operator confirmed correct)
+    'A3':    (4.313, -4.373,  1.797),
+    'A4':    (4.335, -3.552,  1.652),
+    'B1':    (1.721, -8.569, -1.481),
+    'B2':    (1.955, -7.312,  1.683),
+    'B3':    (1.924, -4.563, -1.647),
+    'B4':    (1.961, -3.061,  1.747),
+    'C1':    (-0.891, -8.473,  1.416),
+    'C2':    (-0.790, -6.968, -1.580),
+    'C3':    (-0.678, -5.005,  0.0),  # fallback to Round-1 distance-transform (raw AMCL read was NO_VALID_PATH)
+    'C4':    (-0.706, -3.096,  1.627),
   
     'X1_A':      ( 4.0,  -5.7, 0.0),
     'X1_B':      ( 1.5,  -5.7, 0.0),
@@ -122,6 +114,7 @@ class NavBridgeNode(Node):
         self._goal_handle    = None
         self._pending_goal   = None
         self._pending_wp     = None
+        self._pending_path   = None
         self._pending_cancel = False
 
         # Map
@@ -160,16 +153,8 @@ class NavBridgeNode(Node):
 
         # Action client for FollowWaypoints (multi-rack runs from the GUI)
         self._wp_client = ActionClient(self, FollowWaypoints, 'follow_waypoints')
-
-        # 2026-07-12: rosbag_ground_truth.py (the automated Test G/H script) has always
-        # cleared the global costmap before every goal, but this GUI never did -- stale
-        # obstacle_layer marks (Nav2 only clears a cell when a FRESH scan raytraces
-        # through it, per raytrace_max_range) could persist indefinitely in this robot's
-        # LiDAR blind spot (rear, blocked by the battery pack), confusing later manual
-        # goals. Operator's workaround was manually spinning the robot 360 deg to force a
-        # full re-scan. Auto-clearing before every GUI-sent goal removes the need for that.
-        self._clear_costmap_cli = self.create_client(
-            ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap')
+        
+        self._path_client = ActionClient(self, FollowPath, 'follow_path')
 
         # Timer processes Flask requests inside the ROS executor (non-blocking)
         self.create_timer(0.05, self._tick)
@@ -216,9 +201,11 @@ class NavBridgeNode(Node):
         with self._lock:
             goal      = self._pending_goal
             wp_goal   = self._pending_wp
+            path_goal = self._pending_path 
             do_cancel = self._pending_cancel
             self._pending_goal   = None
             self._pending_wp     = None
+            self._pending_path   = None
             self._pending_cancel = False
 
         if do_cancel:
@@ -247,6 +234,14 @@ class NavBridgeNode(Node):
                     self.nav_status     = 'error'
                     self.current_target = None
                 self.get_logger().error('FollowWaypoints server not ready')
+        elif path_goal:
+          if self._path_client.server_is_ready():
+                self._do_send_path(path_goal)
+          else:
+            with self._lock:
+                self.nav_status     = 'error'
+                self.current_target = None
+            self.get_logger().error('FollowPath server not ready')
 
     def _make_pose(self, x, y, yaw):
         p = PoseStamped()
@@ -258,19 +253,7 @@ class NavBridgeNode(Node):
         p.pose.orientation.w = math.cos(yaw / 2.0)
         return p
 
-    def _clear_global_costmap(self):
-        """Fire-and-forget clear of stale obstacle_layer marks before a new goal.
-        Not awaited -- the robot is stationary when a GUI goal is sent, so a few
-        hundred ms race against the goal being accepted/planned is harmless (same
-        assumption rosbag_ground_truth.py's blocking version relies on)."""
-        if not self._clear_costmap_cli.service_is_ready():
-            self.get_logger().warn(
-                'clear_entirely_global_costmap service not ready, skipping costmap clear')
-            return
-        self._clear_costmap_cli.call_async(ClearEntireCostmap.Request())
-
     def _do_send_goal(self, rack_name):
-        self._clear_global_costmap()
         goal_msg = NavigateToPose.Goal()
         goal_msg.pose = self._make_pose(*RACK_GOALS[rack_name])
         future = self._nav_client.send_goal_async(
@@ -290,7 +273,6 @@ class NavBridgeNode(Node):
         handle.get_result_async().add_done_callback(self._on_done)
 
     def _do_send_wp(self, node_names):
-        self._clear_global_costmap()
         goal_msg = FollowWaypoints.Goal()
         goal_msg.poses = [self._make_pose(*RACK_GOALS[n]) for n in node_names]
         future = self._wp_client.send_goal_async(goal_msg)
@@ -308,6 +290,30 @@ class NavBridgeNode(Node):
             self._goal_handle = handle
         handle.get_result_async().add_done_callback(self._on_done)
 
+    def _do_send_path(self, path_xy):
+        goal_msg = FollowPath()
+        ros_path = NavPath()
+        ros_path.header.frame_id = 'map'
+        ros_path.header.stamp    = self.get_clock().now().to_msg()
+        for x, y in path_xy:
+            ros_path.poses.append(self._make_pose(x, y, 0.0))   # yaw default 0
+        goal_msg = FollowPath.Goal()
+        goal_msg.path = ros_path
+        future = self._path_client.send_goal_async(goal_msg)
+        future.add_done_callback(lambda f: self._on_path_accepted(f, path_xy))
+
+    def _on_path_accepted(self, future, path_xy):
+        handle = future.result()
+        if not handle.accepted:
+            with self._lock:
+                self.nav_status     = 'error'
+                self.current_target = None
+            self.get_logger().warn(f'FollowPath rejected ({len(path_xy)} titik)')
+            return
+        with self._lock:
+            self._goal_handle = handle
+        handle.get_result_async().add_done_callback(self._on_done)
+        
     def _on_done(self, future):
         status = future.result().status
         with self._lock:
@@ -342,6 +348,15 @@ class NavBridgeNode(Node):
             self._pending_wp     = list(node_names)
             self.nav_status      = 'navigating'
             self.current_target  = ' -> '.join(node_names)
+        return True, 'ok'
+      
+    def request_path(self, path_xy):
+        if not path_xy:
+            return False, 'path kosong'
+        with self._lock:
+            self._pending_path  = path_xy
+            self.nav_status      = 'navigating'
+            self.current_target  = f'path({len(path_xy)} titik)'
         return True, 'ok'
 
     def request_cancel(self):
@@ -997,6 +1012,14 @@ def follow_waypoints():
         return jsonify({'status': 'navigating', 'nodes': node_names})
     return jsonify({'status': 'error', 'message': msg}), 400
 
+@app.route('/follow_path', methods=['POST'])
+def follow_path():
+    data = request.get_json(silent=True) or {}
+    path_xy = data.get('path', [])
+    ok, msg = _node.request_path(path_xy)
+    if ok:
+        return jsonify({'status': 'navigating', 'points': len(path_xy)})
+    return jsonify({'status': 'error', 'message': msg}), 400
 
 @app.route('/cancel', methods=['POST'])
 def cancel():

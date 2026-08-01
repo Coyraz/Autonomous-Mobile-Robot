@@ -23,6 +23,7 @@ Usage:
   python3 rosbag_ground_truth.py --test trajectory --mode C
   python3 rosbag_ground_truth.py --test navigation --mode C
   python3 rosbag_ground_truth.py --test obstacle --mode C
+  python3 rosbag_ground_truth.py --test map_geometry --reps 1
 """
 
 import argparse
@@ -60,6 +61,29 @@ TRAJECTORY_SCENARIOS = [
     ('rotation_180',  '180deg', 'Rotate 180 degrees in place, stop'),
     ('rotation_360',  '360deg', 'Rotate 360 degrees in place, stop'),
     ('return_origin', 'loop',   'Drive a loop (Home→B4→C4→C1→Home), stop at start mark'),
+]
+
+# Map geometry test (Test C): all 14 points, TAPE ground truth -- NOT
+# WAREHOUSE_WAYPOINTS (that dict holds AMCL's own readings, re-centered for
+# Nav2 goal-plannability, not a tape measurement). This is the same
+# TITIK_KOORDINAT table canonically stored in test3.md and
+# plot_test_g_trajectory.py -- confirmed 2026-07-24 as the real tape/design
+# ground truth. Do not delete/regenerate; see reference_titik_koordinat.md.
+MAP_GEOMETRY_POINTS = [
+    ('Home',  0.0,  0.0),
+    ('Stage', 3.5,  0.5),
+    ('A1',    4.0, -8.5),
+    ('A2',    4.0, -7.0),
+    ('A3',    4.0, -4.5),
+    ('A4',    4.0, -3.0),
+    ('B1',    1.5, -8.5),
+    ('B2',    1.5, -7.0),
+    ('B3',    1.5, -4.5),
+    ('B4',    1.5, -3.0),
+    ('C1',   -1.0, -8.5),
+    ('C2',   -1.0, -7.0),
+    ('C3',   -1.0, -4.5),
+    ('C4',   -1.0, -3.0),
 ]
 
 # Navigation test (Test G): actual destination points only (racks + Home +
@@ -126,7 +150,20 @@ class GroundTruthMarker(Node):
                   "available, skipping costmap clear.")
             return False
         future = self._clear_costmap_cli.call_async(ClearEntireCostmap.Request())
-        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout_s)
+        # main() runs a background daemon thread that continuously calls
+        # rclpy.spin_once() on this same node (so input() here in the main
+        # thread doesn't block service/topic callbacks). spin_until_future_
+        # complete() would try to enter its OWN spin on top of that already-
+        # spinning node -- rclpy forbids spinning the same node from two
+        # places at once ("Executor is already spinning"). Just poll the
+        # future instead; the background thread is what actually completes
+        # it. Same pattern as custom_path_controller.py's _wait_future().
+        deadline = time.time() + timeout_s
+        while rclpy.ok() and not future.done():
+            if time.time() > deadline:
+                print("    WARNING: clear_entirely_global_costmap timed out.")
+                return False
+            time.sleep(0.02)
         return future.done()
 
 
@@ -171,6 +208,64 @@ def run_localization(node, mode, reps):
     node.publish_event('test_end', test='localization', mode=mode)
     print(f"\nDone! Stop bag recording (Ctrl+C in the bag terminal).")
     print(f"Then run: python3 analyze_localization_bag.py test_e_mode_{mode.lower()}/")
+
+
+def run_map_geometry(node, mode, reps):
+    """Test C: drive to all 14 tape-measured reference points, mark each one.
+
+    mode is unused (kept for TEST_RUNNERS' uniform signature) -- Test C
+    doesn't have A/B/C modes, it's a single map-geometry validation pass.
+    reps defaults to 1 (a single measurement per point, same as the
+    original 2026-06-22 Test C run) but can be raised for repeatability data.
+    """
+    pts = MAP_GEOMETRY_POINTS
+    print("\n" + "=" * 66)
+    print(f" TEST C  -  MAP GEOMETRY (rosbag)  Reps {reps}")
+    print("=" * 66)
+    print("\nReference points (TAPE ground truth, TITIK_KOORDINAT):")
+    for name, x, y in pts:
+        print(f"  {name:6s}  ({x:+6.1f}, {y:+6.1f})")
+
+    print(f"\nMake sure ros2 bag record is running in another terminal!")
+    print(f"Topics to record:")
+    print(f"  ros2 bag record -o test_c_map_geometry "
+          f"/odom_raw /odom /tf /tf_static /amcl_pose /ground_truth_event")
+    input("\nPress Enter when bag recording is started...")
+
+    node.publish_event('test_start', test='map_geometry', reps=reps)
+
+    for rep in range(1, reps + 1):
+        print(f"\n--- REP {rep} / {reps} ---")
+        for name, gt_x, gt_y in pts:
+            input(f"  Drive to {name} ({gt_x:+.1f}, {gt_y:+.1f}), "
+                  f"align to tape, press Enter...")
+            # 2026-07-24: also capture a manual tape-measured offset between
+            # the robot's actual center and the tape mark, taken at the same
+            # moment. This separates two error sources that the AMCL-vs-tape
+            # comparison alone conflates: (1) how precisely the robot was
+            # physically parked on the mark, vs (2) how far AMCL's own
+            # reading is from where the robot actually is. Optional -- press
+            # Enter to skip if not measuring this round.
+            raw = input(f"    Ukur jarak pusat robot ke marka {name} dengan "
+                        f"meteran (cm), atau Enter untuk skip: ").strip()
+            manual_offset_cm = None
+            if raw:
+                try:
+                    manual_offset_cm = float(raw)
+                except ValueError:
+                    print(f"    (input '{raw}' bukan angka, dilewati)")
+            node.publish_event('point_reached',
+                               test='map_geometry', mode='C',
+                               rep=rep, point=name,
+                               gt_x=gt_x, gt_y=gt_y,
+                               manual_offset_cm=manual_offset_cm)
+            print(f"    Marker published for {name} (rep {rep})"
+                  + (f" -- manual offset {manual_offset_cm} cm" if manual_offset_cm is not None else ""))
+            time.sleep(0.5)
+
+    node.publish_event('test_end', test='map_geometry')
+    print(f"\nDone! Stop bag recording (Ctrl+C in the bag terminal).")
+    print(f"Then run: python3 analyze_map_geometry_bag.py test_c_map_geometry/")
 
 
 def run_trajectory(node, mode, reps):
@@ -362,6 +457,7 @@ TEST_RUNNERS = {
     'trajectory': run_trajectory,
     'navigation': run_navigation,
     'obstacle': run_obstacle,
+    'map_geometry': run_map_geometry,
 }
 
 

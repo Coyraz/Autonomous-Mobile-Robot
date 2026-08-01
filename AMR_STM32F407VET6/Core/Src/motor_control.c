@@ -11,7 +11,7 @@ volatile int32_t g_encoder_right_delta = 0;
 
 #define PWM_MIN_MOVING_LEFT   150
 #define PWM_MIN_MOVING_RIGHT  200
-#define MM_PER_TICK           0.04644f
+#define MM_PER_TICK           0.04688f
 #define PID_DT                0.01f
 #define SPEED_MAX             1000
 #define PWM_MAX               999
@@ -28,13 +28,12 @@ void Motor_Init(void) {
     HAL_GPIO_WritePin(MOTOR_R_IN3_GPIO_Port, MOTOR_R_IN3_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(MOTOR_R_IN4_GPIO_Port, MOTOR_R_IN4_Pin, GPIO_PIN_RESET);
 
-    // Initialize PID gains - START WITH THESE, TUNE LATER
-    g_pid_left.kp  = 3.0f;
-    g_pid_left.ki  = 8.0f;
+    g_pid_left.kp  = 6.75f;
+    g_pid_left.ki  = 17.01f;
     g_pid_left.kd  = 0.0f;
 
-    g_pid_right.kp = 3.0f;
-    g_pid_right.ki = 8.0f;
+    g_pid_right.kp = 5.75f;
+    g_pid_right.ki = 19.01f;
     g_pid_right.kd = 0.0f;
 
     g_motor_cmd.last_cmd_time = HAL_GetTick();
